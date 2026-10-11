@@ -1,5 +1,5 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent actions</title>
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Действия агента</title>
 <style>
 :root{--bg:#14161a;--fg:#d8dce3;--mut:#7d8590;--line:#2a2f37;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--acc:#58a6ff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:12px/1.45 -apple-system,BlinkMacSystemFont,"SF Mono",Menlo,monospace}
@@ -14,9 +14,11 @@ pre{margin:4px 10px 8px;font:11px/1.35 "SF Mono",Menlo,monospace;white-space:pre
 #top{position:sticky;top:0;background:var(--bg);z-index:2}#net{max-height:45vh;overflow:auto}#end{position:fixed;right:10px;bottom:10px;width:28px;height:28px;border-radius:14px;background:#1f2a3a;color:var(--acc);display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--line)}
 #net summary{cursor:pointer;color:var(--mut);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;list-style:none}#net summary::-webkit-details-marker{display:none}
 #net table{border-collapse:collapse;width:100%;margin-top:4px}#net td{padding:1px 6px 1px 0;white-space:nowrap}#net td.n{max-width:130px;overflow:hidden;text-overflow:ellipsis}#net .warn{color:var(--warn)}#net .cur{color:var(--acc)}#net .lnk{cursor:pointer;color:var(--acc);font-size:11px}#net .lnk:hover{text-decoration:underline}#net td.act{text-align:right}
-</style></head><body><div id="top"><details id="net" class="s"><summary>network</summary><div id="netb" class="mut">probing…</div></details><div id="hdr" class="s mut">loading…</div></div><div id="list"></div><div id="end" title="jump to latest" onclick="follow=true;sel=null;lastKey=null;tick();toEnd()">⬇</div>
+</style></head><body><div id="top"><details id="net" class="s"><summary>сеть</summary><div id="netb" class="mut">Проверка…</div></details><div id="hdr" class="s mut">Загрузка…</div></div><div id="list"></div><div id="end" title="К последним действиям" onclick="follow=true;sel=null;lastKey=null;tick();toEnd()">⬇</div>
 <script>
-const K={all:"all",bash:"bash",edit:"edits",read:"reads",search:"search",agent:"agents",web:"web",mcp:"mcp"};
+const K={all:"все",bash:"команды",edit:"правки",read:"чтение",search:"поиск",agent:"агенты",web:"интернет",mcp:"MCP"};
+const proxyLabel=n=>n==="direct"?"напрямую":n;
+const statusLabel=s=>({working:"работает",idle:"ожидает",waiting:"ожидает",running:"работает",busy:"занят",stopped:"остановлен"})[s]||s||"";
 let flt="all", sel=null, lastKey=null, follow=true, first=true, lastSid=null;
 try{flt=localStorage.getItem("flt")||"all"}catch(_){}
 const e=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -28,54 +30,54 @@ async function detail(i){const t=await (await fetch("/agent/item?i="+i)).text();
 function render(d){
   const c=d.claude;
   let h=`<h3>${e(d.session)}</h3>`;
-  if(!c){h+=`<div class="mut">no claude running in this pane</div>`;document.getElementById("hdr").innerHTML=h;document.getElementById("list").innerHTML="";return}
+  if(!c){h+=`<div class="mut">В этой области Claude Code не запущен</div>`;document.getElementById("hdr").innerHTML=h;document.getElementById("list").innerHTML="";return}
   if(c.sid!==lastSid){lastSid=c.sid;first=true;sel=null}
   const counts={};d.items.forEach(x=>counts[x.kind]=(counts[x.kind]||0)+1);
-  h+=`<div>${e(c.name||"")} <span class="mut">· ${e(c.status||"")} · pid ${e(c.pid)} · actions ${d.total}</span></div><div class="chips">`;
+  h+=`<div>${e(c.name||"")} <span class="mut">· ${e(statusLabel(c.status))} · pid ${e(c.pid)} · действий: ${d.total}</span></div><div class="chips">`;
   for(const k in K){if(k!=="all"&&!counts[k])continue;h+=`<span class="chip ${flt===k?"on":""}" data-k="${k}">${K[k]}${k==="all"?"":" "+counts[k]}</span>`}
   h+=`</div>`;document.getElementById("hdr").innerHTML=h;
   document.querySelectorAll(".chip").forEach(n=>n.onclick=()=>{flt=n.dataset.k;try{localStorage.setItem("flt",flt)}catch(_){};first=true;lastKey=null;tick()});
   let L="";for(const x of d.items){if(flt!=="all"&&x.kind!==flt)continue;
     L+=`<div class="it ${sel===x.i?"sel":""}" data-i="${x.i}"><span class="t">${e(tm(x.t))}</span><span class="k ${x.kind}">${e(x.kind==="mcp"?x.tool.replace(/^mcp__/,"").replace(/^(plugin|claude_ai)_/,"").split("__")[0].split("_")[0].slice(0,9):x.kind==="other"?x.tool.slice(0,9):K[x.kind])}</span><span class="l ${x.res==="err"?"bad":""}">${x.res==="err"?"✗ ":x.res===null?"… ":""}${e(x.line)}</span></div>${sel===x.i?`<div id="d${x.i}"></div>`:""}`}
-  document.getElementById("list").innerHTML=L||`<div class="s mut">empty</div>`;
+  document.getElementById("list").innerHTML=L||`<div class="s mut">Нет действий</div>`;
   document.querySelectorAll(".it").forEach(n=>n.onclick=()=>{const i=+n.dataset.i;sel=sel===i?null:i;follow=false;lastKey=null;tick()});
   if(sel!==null)detail(sel);
   if(follow||first){first=false;toEnd()}
 }
 let V=null;
-async function tick(){try{const d=await (await fetch("/agent/state")).json();if(V&&d.v!==V){location.reload();return}V=d.v;const key=JSON.stringify([d.claude&&d.claude.sid,d.claude&&d.claude.status,d.total,d.items.length&&d.items[d.items.length-1].res,flt,sel]);if(key!==lastKey){lastKey=key;render(d)}}catch(_){document.getElementById("hdr").innerHTML='<span class="bad">panel is not responding</span>'}}
+async function tick(){try{const d=await (await fetch("/agent/state")).json();if(V&&d.v!==V){location.reload();return}V=d.v;const key=JSON.stringify([d.claude&&d.claude.sid,d.claude&&d.claude.status,d.total,d.items.length&&d.items[d.items.length-1].res,flt,sel]);if(key!==lastKey){lastKey=key;render(d)}}catch(_){document.getElementById("hdr").innerHTML='<span class="bad">Панель не отвечает</span>'}}
 tick();setInterval(tick,1000);
 // ── network: the proxy this claude runs through, proxy liveness, foreign servers
 const nd=document.getElementById("net");try{nd.open=localStorage.getItem("net")!=="0"}catch(_){nd.open=true}
 nd.addEventListener("toggle",()=>{try{localStorage.setItem("net",nd.open?"1":"0")}catch(_){}});
-const api=r=>!r||!r.code?`<span class="bad">dead</span>`:r.code===403?`<span class="warn">403 ${r.ms}ms</span>`:r.code<500?`<span class="ok">${r.ms}ms</span>`:`<span class="warn">${r.code}</span>`;
+const api=r=>!r||!r.code?`<span class="bad">недоступен</span>`:r.code===403?`<span class="warn">403 ${r.ms} мс</span>`:r.code<500?`<span class="ok">${r.ms} мс</span>`:`<span class="warn">${r.code}</span>`;
 const up=r=>r&&r.code&&r.code!==403&&r.code<500;
 // a proxy is alive when every agent CLI can reach its API through it
 const alive=p=>!!(p&&p.res&&Object.values(p.res).length&&Object.values(p.res).every(up));
 async function net(){try{const d=await (await fetch("/net/state")).json();const pr=d.probe;
-  const cur=d.session;let h="",sum="network";
+  const cur=d.session;let h="",sum="сеть";
   if(cur){const row=pr&&pr.proxies.find(x=>x.name===cur.name);const ok=row?alive(row):null;
-    sum=`network · claude via <span class="${ok===false?"bad":ok?"ok":"cur"}">${e(cur.name)}</span>`;
-    h+=`<div>this claude → <b class="cur">${e(cur.name)}</b> ${cur.url?`<span class="mut">${e(cur.url)}</span>`:""} ${ok===false?'<span class="bad">✗ proxy is down</span>':ok?'<span class="ok">✓ alive</span>':""}</div>`}
-  if(!pr){h+=`<div class="mut">probing…</div>`}else{
+    sum=`сеть · Claude: <span class="${ok===false?"bad":ok?"ok":"cur"}">${e(proxyLabel(cur.name))}</span>`;
+    h+=`<div>Этот Claude → <b class="cur">${e(proxyLabel(cur.name))}</b> ${cur.url?`<span class="mut">${e(cur.url)}</span>`:""} ${ok===false?'<span class="bad">✗ прокси недоступен</span>':ok?'<span class="ok">✓ доступен</span>':""}</div>`}
+  if(!pr){h+=`<div class="mut">Проверка…</div>`}else{
     const tg=pr.targets||[];
-    h+=`<table><tr class="mut"><td>proxy</td>${tg.map(t=>`<td>${e(t)}</td>`).join("")}<td></td></tr>`;
-    for(const p of pr.proxies)h+=`<tr><td class="n ${cur&&cur.name===p.name?"cur":""}" title="${e(p.hp)}">${alive(p)?"●":"○"} ${e(p.name)}</td>${tg.map(t=>`<td>${api(p.res&&p.res[t])}</td>`).join("")}<td class="act"><span class="lnk" data-copy="${e(p.name)}" title="copy an export line for a shell">⧉ export</span> <span class="lnk" data-run="${e(p.name)}" data-tool="claude" title="new claude in this directory through this proxy">▶ claude</span> <span class="lnk" data-run="${e(p.name)}" data-tool="codex" title="new codex in this directory through this proxy">▶ codex</span></td></tr>`;
+    h+=`<table><tr class="mut"><td>прокси</td>${tg.map(t=>`<td>${e(t)}</td>`).join("")}<td></td></tr>`;
+    for(const p of pr.proxies)h+=`<tr><td class="n ${cur&&cur.name===p.name?"cur":""}" title="${e(p.hp)}">${alive(p)?"●":"○"} ${e(proxyLabel(p.name))}</td>${tg.map(t=>`<td>${api(p.res&&p.res[t])}</td>`).join("")}<td class="act"><span class="lnk" data-copy="${e(p.name)}" title="Скопировать команду настройки прокси">⧉ копировать</span> <span class="lnk" data-run="${e(p.name)}" data-tool="claude" title="Новый Claude в текущем каталоге через этот прокси">▶ claude</span> <span class="lnk" data-run="${e(p.name)}" data-tool="codex" title="Новый Codex в текущем каталоге через этот прокси">▶ codex</span></td></tr>`;
     h+=`</table>`;
     const kn=d.keenetic;
-    if(kn&&kn.error){h+=`<div class="mut">router: ${e(kn.error)}</div>`}
-    else if(kn&&kn.tunnels){const ago=x=>x===null?"—":x<120?x+"s":Math.round(x/60)+"m";const mb=b=>b==null?"":(b/1048576).toFixed(b>1048576*10?0:1)+"M";
-      h+=`<table><tr class="mut"><td>tunnel</td><td>check</td><td>handshake</td><td>rx/tx</td></tr>`;
+    if(kn&&kn.error){h+=`<div class="mut">Роутер: ${e(kn.error)}</div>`}
+    else if(kn&&kn.tunnels){const ago=x=>x===null?"—":x<120?x+" с":Math.round(x/60)+" мин";const mb=b=>b==null?"":(b/1048576).toFixed(b>1048576*10?0:1)+" МБ";
+      h+=`<table><tr class="mut"><td>туннель</td><td>проверка</td><td>рукопожатие</td><td>приём/отправка</td></tr>`;
       for(const t of kn.tunnels){const st=!t.up||t.check==="fail"?"bad":t.check==="pass"?"ok":"warn";
-        h+=`<tr><td class="n" title="${e(t.iface)}"><span class="${st}">●</span> ${e(t.desc||t.iface)}</td><td class="${st}">${t.up?e(t.check||"on"):"down"}</td><td>${ago(t.handshake)}</td><td class="mut">${mb(t.rx)}/${mb(t.tx)}</td></tr>`}
+        h+=`<tr><td class="n" title="${e(t.iface)}"><span class="${st}">●</span> ${e(t.desc||t.iface)}</td><td class="${st}">${t.up?e(({pass:"норма",fail:"ошибка"})[t.check]||"включён"):"выключен"}</td><td>${ago(t.handshake)}</td><td class="mut">${mb(t.rx)}/${mb(t.tx)}</td></tr>`}
       h+=`</table><table>`;const dn=Object.fromEntries(kn.tunnels.map(t=>[t.iface,t.desc||t.iface]));
-      for(const g of kn.groups)h+=`<tr><td class="n">${e(g.name.replace(/^vpn-/,""))}</td><td>${g.active?`<span class="ok">→ ${e(dn[g.active])}</span>`:'<span class="bad">no live tunnel</span>'} <span class="mut">${e(g.chain.map(i=>(dn[i]||i).replace(/^(NL|US)-/,"")).join(" › "))}</span></td></tr>`;
+      for(const g of kn.groups)h+=`<tr><td class="n">${e(g.name.replace(/^vpn-/,""))}</td><td>${g.active?`<span class="ok">→ ${e(dn[g.active])}</span>`:'<span class="bad">Нет доступного туннеля</span>'} <span class="mut">${e(g.chain.map(i=>(dn[i]||i).replace(/^(NL|US)-/,"")).join(" › "))}</span></td></tr>`;
       h+=`</table>`}
-    if(pr.servers.length){h+=`<table><tr class="mut"><td>server</td><td>ping</td><td>port</td></tr>`;
+    if(pr.servers.length){h+=`<table><tr class="mut"><td>сервер</td><td>ping</td><td>порт</td></tr>`;
       for(const s of pr.servers){const st=(s.banner||(s.nobanner&&s.tcp!==null))?"ok":s.tcp!==null?"warn":"bad";
-        h+=`<tr><td class="n" title="${e(s.host)}:${s.port}"><span class="${st}">●</span> ${e(s.name)}</td><td>${s.ping!==null?s.ping+"ms":'<span class="mut">—</span>'}</td><td class="${st}">${(s.banner||s.nobanner)&&s.tcp!==null?s.tcp+"ms":s.tcp!==null?"open, no banner":"closed"}</td></tr>`}
+        h+=`<tr><td class="n" title="${e(s.host)}:${s.port}"><span class="${st}">●</span> ${e(s.name)}</td><td>${s.ping!==null?s.ping+" мс":'<span class="mut">—</span>'}</td><td class="${st}">${(s.banner||s.nobanner)&&s.tcp!==null?s.tcp+" мс":s.tcp!==null?"открыт, без приветствия":"закрыт"}</td></tr>`}
       h+=`</table>`}
-    h+=`<div class="mut">checked ${new Date(pr.at*1000).toLocaleTimeString("ru-RU")}, from this Mac · <a href="/settings#network" style="color:var(--acc);text-decoration:none">✎ edit proxies and servers</a></div>`}
+    h+=`<div class="mut">Проверено: ${new Date(pr.at*1000).toLocaleTimeString("ru-RU")}, с этого Mac · <a href="/settings#network" style="color:var(--acc);text-decoration:none">✎ изменить прокси и серверы</a></div>`}
   nd.querySelector("summary").innerHTML=sum;document.getElementById("netb").innerHTML=h}catch(_){}}
 net();setInterval(net,5000);
 // proxy actions: the export line (with the password) is put on the clipboard by the service, not shown here
@@ -83,6 +85,6 @@ document.getElementById("netb").addEventListener("click",async ev=>{const t=ev.t
   const copy=t.dataset.copy,run=t.dataset.run,old=t.textContent;t.textContent="…";
   try{const r=await (await fetch((copy?"/net/copy?":"/sessions/open?")+new URLSearchParams(copy?{name:copy}:{tool:t.dataset.tool||"claude",proxy:run}),
       {method:"POST",headers:{"X-Toolbelt":"1"}})).text();
-    t.textContent=r==="copied"?"✓ copied":r==="ok"?"✓ opened":"✗ "+r}catch(_){t.textContent="✗ error"}
+    t.textContent=r==="copied"?"✓ скопировано":r==="ok"?"✓ открыто":"✗ "+r}catch(_){t.textContent="✗ ошибка"}
   setTimeout(()=>{t.textContent=old},1800)});
 </script></body></html>

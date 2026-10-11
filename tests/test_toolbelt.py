@@ -79,7 +79,7 @@ def test_edit_detail_is_a_diff(t):
     d = t._detail("Edit", {"file_path": "/a.py", "old_string": "x = 1", "new_string": "x = 2\ny = 3"})
     assert d.splitlines() == ["@@ /a.py", "-x = 1", "+x = 2", "+y = 3"]
     w = t._detail("Write", {"file_path": "/b.py", "content": "a\nb"})
-    assert w.startswith("@@ /b.py (new/overwritten)") and "+a" in w and "+b" in w
+    assert w.startswith("@@ /b.py (создан/перезаписан)") and "+a" in w and "+b" in w
 
 
 # ─────────────── Agent actions: transcript ───────────────
@@ -567,12 +567,12 @@ def test_omp_new_overlay_follows_user_config(t):
 
 
 def test_open_agent_rejects_bad_input_before_touching_iterm(t, tmp_path):
-    assert asyncio.run(t.open_agent({"id": "../../etc", "tool": "claude"})) == "bad id"
-    assert asyncio.run(t.open_agent({"id": "x", "tool": "pi"})) == "no connection to iTerm"
-    assert asyncio.run(t.open_agent({"tool": "claude", "proxy": "missing"})) == "cannot launch claude via missing"
-    assert asyncio.run(t.open_agent({"tool": "claude", "dir": str(tmp_path / "nope")})).startswith("no such directory")
+    assert asyncio.run(t.open_agent({"id": "../../etc", "tool": "claude"})) == "Некорректный ID"
+    assert asyncio.run(t.open_agent({"id": "x", "tool": "pi"})) == "Нет соединения с iTerm2"
+    assert asyncio.run(t.open_agent({"tool": "claude", "proxy": "missing"})) == "Не удалось запустить claude через missing"
+    assert asyncio.run(t.open_agent({"tool": "claude", "dir": str(tmp_path / "nope")})).startswith("Каталог не существует")
     t.CONN.clear()
-    assert asyncio.run(t.open_agent({"tool": "claude"})) == "no connection to iTerm"
+    assert asyncio.run(t.open_agent({"tool": "claude"})) == "Нет соединения с iTerm2"
 
 
 @pytest.mark.parametrize("stat,tty", [("S", "??"), ("T", "ttys001")])
@@ -590,7 +590,7 @@ def test_open_agent_blocks_pi_resume_in_project_with_pi_process(t, monkeypatch, 
 
     monkeypatch.setattr(t, "run", fake_run)
     assert asyncio.run(t.open_agent({"tool": "pi", "id": "session-1", "dir": str(alias)})) == (
-        "pi is already running in this project; close it before resuming")
+        "pi уже работает в этом проекте; закройте его перед продолжением")
 
 
 def test_open_agent_reserves_pi_project_during_process_check(t, monkeypatch, tmp_path):
@@ -612,18 +612,18 @@ def test_open_agent_reserves_pi_project_during_process_check(t, monkeypatch, tmp
             if calls == 1:
                 entered.set()
                 await proceed.wait()
-            return "could not check running pi processes"
+            return "Не удалось проверить работающие процессы pi"
 
         monkeypatch.setattr(t, "_pi_resume_guard", guard)
         first = asyncio.create_task(t.open_agent({"tool": "pi", "id": "session-1", "dir": str(project)}))
         await entered.wait()
         assert await t.open_agent({"tool": "pi", "id": "session-1", "dir": str(alias)}) == (
-            "pi is already starting in this project")
+            "pi уже запускается в этом проекте")
         assert calls == 1
         proceed.set()
-        assert await first == "could not check running pi processes"
+        assert await first == "Не удалось проверить работающие процессы pi"
         assert await t.open_agent({"tool": "pi", "id": "session-1", "dir": str(alias)}) == (
-            "could not check running pi processes")
+            "Не удалось проверить работающие процессы pi")
         assert calls == 2  # an error before launch releases the reservation
 
     asyncio.run(scenario())
@@ -677,7 +677,7 @@ def test_open_agent_keeps_pi_reservation_after_send(t, monkeypatch, tmp_path):
     async def scenario():
         q = {"tool": "pi", "id": "session-1", "dir": str(project)}
         assert await t.open_agent(q) == "ok"
-        assert await t.open_agent(q) == "pi is already starting in this project"
+        assert await t.open_agent(q) == "pi уже запускается в этом проекте"
         assert len(commands) == 1
 
     asyncio.run(scenario())
@@ -742,7 +742,7 @@ def test_pi_resume_guard_stops_if_process_check_fails(t, monkeypatch, tmp_path):
 
     monkeypatch.setattr(t, "run", fake_run)
     monkeypatch.setattr(t.os, "kill", lambda pid, sig: None)
-    assert asyncio.run(t._pi_resume_guard(str(project))) == "could not check running pi processes"
+    assert asyncio.run(t._pi_resume_guard(str(project))) == "Не удалось проверить работающие процессы pi"
 
 
 def test_pi_resume_guard_ignores_process_that_exited(t, monkeypatch, tmp_path):
@@ -809,11 +809,11 @@ def test_settings_rename_proxy_keeps_its_password(t):
 
 
 @pytest.mark.parametrize("proxies, err", [
-    ([{"name": "x", "url": "ftp://h:1"}], "expected scheme"),
-    ([{"name": "x", "url": "http://nohost"}], "expected scheme"),
-    ([{"name": "a", "url": "http://h:1"}, {"name": "a", "url": "http://h:2"}], "taken"),
-    ([{"name": "direct", "url": "http://h:1"}], "reserved"),
-    ([{"name": "", "url": "http://h:1"}], "empty"),
+    ([{"name": "x", "url": "ftp://h:1"}], "ожидается scheme"),
+    ([{"name": "x", "url": "http://nohost"}], "ожидается scheme"),
+    ([{"name": "a", "url": "http://h:1"}, {"name": "a", "url": "http://h:2"}], "занято"),
+    ([{"name": "direct", "url": "http://h:1"}], "зарезервировано"),
+    ([{"name": "", "url": "http://h:1"}], "пустое"),
 ])
 def test_settings_rejects_bad_proxies_without_saving(t, proxies, err):
     before = open(t.CONFIG_FILE).read()
@@ -830,7 +830,7 @@ def test_settings_servers_and_router(t):
     assert t.CFG["servers"] == [{"name": "a", "host": "1.2.3.4", "port": 8443, "banner": False},
                                 {"name": "5.6.7.8", "host": "5.6.7.8", "port": 22}]
     assert t.CFG["keenetic"] == {"host": "10.0.0.1", "login": "admin", "password": "pw"}
-    assert "port must be a number" in _save(t, {"servers": [{"name": "b", "host": "h", "port": "x"}]})
+    assert "порт должен быть числом" in _save(t, {"servers": [{"name": "b", "host": "h", "port": "x"}]})
     assert _save(t, {"keenetic": {"host": ""}}) == "ok"
     assert "keenetic" not in json.load(open(t.CONFIG_FILE))
 
@@ -840,8 +840,8 @@ def test_settings_agents_tabs_and_garbage(t):
     assert t.CFG["agents"]["claude"]["proxy"] == "us-1" and "evil" not in t.CFG["agents"]["claude"]
     assert "nobody" not in t.CFG["agents"]
     assert _save(t, {"tabs": {"settings": True}}) == "restart"
-    assert t.settings_save(b"{nope") == "not JSON"
-    assert t.settings_save(b"[1]") == "not an object"
+    assert t.settings_save(b"{nope") == "Некорректный JSON"
+    assert t.settings_save(b"[1]") == "Ожидается JSON-объект"
 
 
 # ─────────────── network ───────────────
@@ -997,7 +997,7 @@ def test_http_open_url_rejects_invalid_urls(t, monkeypatch, url):
     run = AsyncMock(return_value=(0, ""))
     monkeypatch.setattr(t, "run", run)
     path = "/open-url?" + urlencode({"url": url})
-    assert asyncio.run(_http(t, _req("POST", path, header=True))) == (400, "invalid URL")
+    assert asyncio.run(_http(t, _req("POST", path, header=True))) == (400, "Некорректный URL")
     run.assert_not_awaited()
 
 
@@ -1005,7 +1005,7 @@ def test_http_open_url_reports_launch_failure(t, monkeypatch):
     monkeypatch.setattr(t, "run", AsyncMock(return_value=(1, "No application knows how to open the URL")))
     path = "/open-url?" + urlencode({"url": "https://github.com/owner/repo/pull/1"})
     assert asyncio.run(_http(t, _req("POST", path, header=True))) == (
-        502, "could not open URL: No application knows how to open the URL")
+        502, "Не удалось открыть URL: No application knows how to open the URL")
 
 
 def test_http_copy_puts_one_line_with_newline_on_clipboard(t, monkeypatch):
@@ -1028,7 +1028,7 @@ def test_http_copy_puts_one_line_with_newline_on_clipboard(t, monkeypatch):
 
 def test_http_basics(t):
     code, body = asyncio.run(_http(t, _req("POST", "/net/copy?name=nope", header=True)))
-    assert (code, body) == (200, "unknown proxy")
+    assert (code, body) == (200, "Неизвестный прокси")
     assert asyncio.run(_http(t, _req("GET", "/nothing")))[0] == 404
     code, body = asyncio.run(_http(t, _req("GET", "/settings/state")))
     assert code == 200 and "s3cret" not in body and json.loads(body)["config"]["proxies"][0]["name"] == "eu-1"

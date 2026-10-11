@@ -1,109 +1,206 @@
-# agentbelt
+# agentbelt — боковая панель AI-агентов для iTerm2
 
-An iTerm2 sidebar for AI coding agents: Claude Code, Codex, pi and omp sessions, a live Claude Code action feed, git and PR state, and proxy health for regions where AI APIs are restricted or blocked. It lives in the iTerm2 **Toolbelt** and follows the active terminal pane: switch to another iTerm tab and the sidebar shows that one.
+agentbelt добавляет боковую панель для работы с AI-агентами в **iTerm2 на macOS**. Панель следует за активной терминальной областью: показывает её Git-репозиторий, действия Claude Code, сохранённые сессии агентов и доступность API через прокси.
 
-*Formerly `iterm-toolbelt`: old links redirect, `install.sh` moves an existing install over.*
+Это вспомогательная панель для уже установленных CLI. Установщик agentbelt устанавливает Python-библиотеку `iterm2`, но сами Claude Code, Codex, pi, omp и GitHub CLI нужно установить и авторизовать отдельно.
 
-![Agent actions with proxy health per CLI, running agents, window snapshots](docs/overview.png)
+Интерфейс, сообщения agentbelt и документация используют русский язык. Команды, имена параметров, пути и названия продуктов сохраняют исходное написание. Пункты меню самого iTerm2 приведены так, как они называются в приложении.
 
-![Sessions: pick an agent, its projects, resume or start a session](docs/sessions.png)
+## Документация
 
-*Screenshots use made-up demo data.*
+- [Настройки, прокси и собственные проверки репозитория](docs/configuration.ru.md).
+- [Архитектура, локальные HTTP-маршруты и разработка](docs/architecture.ru.md).
+- [Исходная инструкция по развёртыванию прокси на VPS](docs/proxies.md).
 
-| tab | what it shows |
+## Версия и локализация
+
+Документация сверена 11 октября 2026 года с `main`, коммит `c859464`, внутренняя версия приложения `0.1.0`.
+
+| Параметр | Значение |
 |---|---|
-| **◆ Git & PR** | branch, ahead/behind `origin/main` and upstream, changed files with a diff on click, the branch PR and its CI (`gh`), your open PRs, worktrees, custom repo checks |
-| **◆ Agent actions** | a live feed of what Claude Code does in this pane: bash commands, file edits with diffs, reads, searches, subagents, web, MCP. Failed calls are marked, passwords and tokens in commands are masked. A **network** block on top shows which proxy this claude runs through and, for every proxy in your list, whether each agent CLI reaches its API through it (claude → api.anthropic.com, codex → chatgpt.com or api.openai.com, openai → api.openai.com). Every proxy row has **⧉ export** (an `export HTTPS_PROXY=…` line straight to the clipboard), **▶ claude** and **▶ codex** (a new agent in the current directory through that proxy); optional list of your servers with ping and SSH reachability, and Keenetic tunnels |
-| **◆ Sessions** | Claude Code, Codex, pi and omp: pick an agent → project tiles → project sessions with **Resume** (new iTerm window or tab), **＋ new** session in a project. The running-agent view detects Claude Code, Codex and pi and can jump to their panes when they have a terminal. The tab also saves **window snapshots**. |
-| ⚙ settings | opened from the Sessions tab: intro, a default proxy (picked from your list) or a prefix and flags for launching agents, **your own proxy and server lists and the Keenetic router**, where to open sessions, which tabs are on, auto-show of the Toolbelt, custom repo checks |
+| Форк (`origin`) | `https://github.com/Iver15/agentbelt.git` |
+| Исходный проект (`upstream`) | `https://github.com/vakovalskii/agentbelt.git` |
+| Локальный каталог | `/Users/mizenko/Vibecode/agentbelt` |
+| Сравнение с исходным проектом | `HEAD` совпадал с локальным `upstream/main`; собственных отличий кода в `main` не было |
+| Другая ветка | В локальных remote-tracking refs есть `feat/windows-wezterm`; её возможности не входят в изученную `main` |
 
-## Install
+Сравнение выполнено до локализации по локальным Git-ссылкам без обновления удалённых веток. В этом форке к изученному коду добавлен русский интерфейс. Состояние GitHub после этой проверки может отличаться.
+
+В установленной копии подтверждены загруженный LaunchAgent `dev.agentbelt`, запуск `agentbelt.py` из указанного каталога, Python 3.12.14, библиотека `iterm2` 2.25, права `0600` у конфигурации и локальный HTTP-сервис на порту `47811`. Четыре HTML-страницы и два проверенных JSON-маршрута отвечали HTTP 200; сканер сессий сообщил готовность. Тесты: **136 успешно пройдено**. Эти проверки не включали ручной запуск/возобновление агентов, восстановление окон или проверку авторизации внешних API.
+
+## Быстрый старт для установленной копии
+
+1. Откройте iTerm2.
+2. Включите **Settings → General → Magic → Enable Python API**. При запросе доступа разрешите скрипт agentbelt.
+3. Откройте **View → Toolbelt** и включите **◆ Git и PR**, **◆ Действия агента**, **◆ Сессии**. Показать или скрыть панель можно сочетанием **⌘⇧B**.
+4. В терминале перейдите в рабочий проект: `cd /путь/к/проекту`.
+5. Откройте **◆ Сессии → ⚙ настройки**. Настройте запуск агентов, при необходимости прокси, затем нажмите **Сохранить**.
+6. Для возобновления выберите карточку агента → проект → нужную сессию → **Продолжить**.
+
+Если панель не появилась, перейдите к [диагностике](#диагностика).
+
+## Установка с нуля
+
+Требуются macOS, iTerm2 3.3+ и **Python 3.10+**. В исходном README указано тестирование с iTerm2 3.7. Для сведений о PR/CI нужен установленный и авторизованный `gh`; для проверки синтаксиса JavaScript в тестах нужен Node.js.
+
+Для уже скачанного форка:
 
 ```bash
-git clone https://github.com/vakovalskii/agentbelt ~/agentbelt
-~/agentbelt/install.sh
+cd /Users/mizenko/Vibecode/agentbelt
+./install.sh
 ```
 
-Then in iTerm2:
+При новой установке форка в другой каталог:
 
-1. **Settings → General → Magic → Enable Python API.** On first run iTerm asks to allow the script.
-2. **View → Toolbelt** and tick the tabs starting with «◆». Show or hide the Toolbelt: ⌘⇧B. New windows open the Toolbelt by themselves.
-3. In **◆ Sessions** press **⚙**: a short intro and agent launch settings (e.g. a proxy).
-
-Requires macOS, iTerm2 3.3+ (tested on 3.7) and python3. PR and CI info needs a logged-in [`gh`](https://cli.github.com/).
-
-`install.sh` creates a venv in `~/.config/agentbelt/venv`, the config `~/.config/agentbelt/config.json` and the LaunchAgent `dev.agentbelt`. An install under the old name is picked up: the config is copied from `~/.config/iterm-toolbelt`, the old `dev.iterm-toolbelt` service is stopped. The service starts at login and restarts if it crashes. Update: `git pull && ./install.sh`. Uninstall: `./uninstall.sh`.
-
-If the iTerm2 API connection drops (for example, after restarting iTerm2 or waking the Mac),
-the service exits and launchd restarts it with a fresh connection and Toolbelt registrations.
-The local pages are briefly unavailable during recovery; launchd may delay restarting by up to
-10 seconds, and iTerm2 must be available again. A script started manually exits on disconnect;
-use `install.sh` for automatic recovery.
-
-## Proxies for Claude Code and Codex
-
-If AI APIs are blocked or region-restricted where you work, see **[docs/proxies.md](docs/proxies.md)**: a small
-password-protected HTTP proxy on a VPS (gost in Docker, five minutes), pointing Claude Code and Codex at it,
-and how to keep it from becoming an open proxy (secrets file, firewall allowlist, or publishing it only inside
-a WireGuard/AmneziaWG tunnel). The toolbelt then manages the list, probes every proxy against each CLI's API
-and launches agents through the one that works.
-
-## How it works
-
-- One Python process: a small HTTP server on `127.0.0.1` serves the pages from `pages/`, and iTerm2 shows them as Toolbelt tabs (`iterm2.tool.async_register_web_view_tool`). The same iTerm2 Python API tells us the active pane (`FocusMonitor`), its directory and tty, and opens windows to resume sessions.
-- **Agent actions.** The `claude` process on the pane's tty → `~/.claude/sessions/<pid>.json` (holds the session id) → the transcript `~/.claude/projects/<dir>/<id>.jsonl`, read incrementally from where it stopped.
-- **Network.** `HTTPS_PROXY` is read from the environment of the running `claude` (`ps eww`). Every 60 s each proxy from `proxies` in the config is probed with curl against the endpoint each agent CLI really calls (the proxy URL goes through stdin, never argv); without a key every API answers 401, which counts as reachable, 403 is a region block, servers from `servers` get a ping and a TCP connect with an SSH banner read. Everything runs from your Mac, so it shows what works from where you are now. Both lists stay in the local config only. With `keenetic` set (router address, login, password), the block also reads the router over its RCI API: every WireGuard tunnel with its ping-check state, last handshake and traffic, and for each `dns-proxy route object-group` group the tunnel it is going through right now and its fallback order.
-- **Sessions.** Scans `~/.claude/projects/*/*.jsonl`, `~/.codex/sessions/*/*/*/*.jsonl`, `~/.pi/agent/sessions/*/*.jsonl` and `~/.omp/agent/sessions/*/*.jsonl`. The header and first message are read from the first 512 KB; pi's latest saved name is found by reading backward once, then reading only appended bytes. Pi and omp use the session ID and project directory from the session header; omp's optional leading title record is supported. Results are cached on disk: the first pass over a couple thousand sessions takes tens of seconds in the background, after that only changed files are read.
-- Codex sessions use their own first metadata record, preserving the ID and project of user-created forks. Subagent sessions are hidden; titles skip service context and empty text. Old scan caches are rebuilt automatically when their format version changes.
-- **New omp sessions.** **＋ new** passes a one-run `autoResume: false` settings overlay, so it creates a saved session even when auto-resume is enabled in omp's global or project settings. **Resume** still uses `omp -r <id>`.
-- Idle, the process uses about 90 MB of memory and 0–3% CPU.
-- PR links open in the default browser through macOS `open`, keeping the Toolbelt on the Git & PR page.
-- Anything that launches something (`/sessions/open`, `/sessions/focus`, `/snaps/*`, `/settings/save`, `/net/copy`, `/open-url`) accepts only POST with the `X-Toolbelt: 1` header, which a foreign web page cannot send. `/open-url` accepts only HTTP(S) URLs.
-- Proxy passwords never reach the pages: the settings page gets masked URLs (an untouched masked URL is saved back as the stored one), and ⧉ export puts the line on the clipboard from the service side.
-- Running agents skip processes suspended with Ctrl+Z, and a session resumed in a second process shows once. A running pi process does not expose its current session ID, so **Resume** is blocked while any pi process is open in the same project directory (including a suspended process). A brief reservation also prevents two simultaneous Resume requests before the process appears; **＋ new** still works.
-
-## Window snapshots (TermDeck compatible)
-
-The "snapshots" screen in Sessions: **Save** captures the current window or all iTerm windows (tabs, splits, tab names, directories, agent sessions), **Restore** brings a snapshot back in a new window: tabs, splits, `cd` and `claude --resume` in every pane.
-
-- Snapshots live in `~/.config/itermsnap/snaps/` in the [TermDeck](https://github.com/vakovalskii/termdeck) format, so the TermDeck app and the toolbelt see the same snapshots.
-- The session id is taken from the `claude` process in the pane (`~/.claude/sessions/<pid>.json`), not guessed from the newest file in the directory.
-- Autosave every 5 minutes (`"autosave": true`): only when something changed and at least one agent runs; the last 20 `auto-*` are kept. If all windows close at once, the last good snapshot is not overwritten by an empty one.
-- If an iTerm dynamic profile named `TermDeck` exists (title changes disabled), windows are restored with it and tab names stick.
-
-## Tests
-
-`tests/` covers the logic that does not need a running iTerm (the `iterm2` module is stubbed): secret masking,
-the Agent actions transcript reader, the Claude Code, Codex, pi and omp session scanner, running-agent detection,
-launch commands with proxies, settings save and validation (passwords never leave the config), network probes,
-Keenetic parsing, snapshots, the HTTP guard on state-changing endpoints, and a syntax check of every page script.
-They run in GitHub Actions on every push (`.github/workflows/tests.yml`); locally: `python3 -m pytest -q tests`.
-
-## Config
-
-`~/.config/agentbelt/config.json` (mode 600, it may hold a proxy with a password). Everything is editable on the ⚙ page in Sessions (proxies, servers and the router in the **Network** section), or by hand, see `config.example.json`. The config is yours alone and never goes into the repo.
-
-```json
-{
-  "agents": {
-    "claude": {"prefix": "HTTPS_PROXY='http://user:pass@host:port'", "flags": "", "skip_permissions": true},
-    "codex":  {"prefix": "", "flags": ""},
-    "pi":     {"prefix": "", "flags": ""},
-    "omp":    {"prefix": "", "flags": ""}
-  },
-  "open_in": "window",
-  "repo_checks": [
-    {"name": "Containers", "file": "docker-compose.yml", "cmd": "docker compose ps --format '{{.Name}} {{.State}}'", "max_lines": 6}
-  ]
-}
+```bash
+git clone https://github.com/Iver15/agentbelt.git ~/agentbelt
+cd ~/agentbelt
+./install.sh
 ```
 
-`repo_checks` are your own lines in Git & PR: if `file` exists in the repo root, `cmd` runs; exit code 0 is shown green, anything else red.
+Скрипт создаёт окружение `~/.config/agentbelt/venv`, конфигурацию `~/.config/agentbelt/config.json`, файл LaunchAgent и запускает сервис. LaunchAgent ссылается на исходники в каталоге репозитория: после установки каталог нужен для работы приложения. После перемещения каталога повторите установку из нового места.
 
-## What iTerm2 already has
+**При первой установке копируется `config.example.json` с демонстрационным прокси `eu-1`, серверами и адресом Keenetic.** Откройте настройки **Сеть**, удалите ненужные примеры и выберите для агентов подходящий режим прокси. У Claude в примере выбран `eu-1`: без настройки реального прокси такой запуск не будет полезен. Для прямого соединения выберите **напрямую** (значение `direct` в конфигурации). Повторная установка сохраняет существующий `config.json`.
 
-iTerm2 3.7 ships its own Claude Code integration: the Session Status tool, the Cockpit window, Workgroups with diff and review, and Codex support in 3.7.4 beta. agentbelt complements it with a Claude Code action feed, a browser for resuming Claude Code, Codex, pi and omp sessions, window snapshots with agent resume, and git/PR for the active pane.
+Затем выполните настройку iTerm2 из раздела быстрого старта. Сервис стартует при входе в macOS и перезапускается через `launchd` после завершения процесса.
 
-## License
+## Работа с панелью
 
-MIT
+### ◆ Git и PR
+
+Панель отображает репозиторий активной области терминала:
+
+- текущую ветку и последний коммит;
+- количество коммитов относительно `origin/main` и отслеживаемой ветки;
+- **Изменения**: изменённые и новые файлы; нажмите на файл, чтобы увидеть diff;
+- **PR текущей ветки** и результат CI для рабочей ветки;
+- **Мои открытые PR**, рабочие деревья и пользовательские **Проверки репозитория**.
+
+PR-ссылки открываются в браузере по умолчанию. Для `main`, `master` и detached HEAD блок PR текущей ветки не запрашивается. Отсутствие PR в панели может означать как отсутствие PR, так и проблему с `gh`; проверьте `gh auth status`.
+
+Панель выполняет `git fetch -q origin` не чаще одного раза в пять минут для каждого посещённого репозитория. Сравнение с основной веткой жёстко привязано к `origin/main`: в репозитории с другой основной веткой эти значения могут быть недоступны. Список изменений ограничен 200 строками, число всех изменений показывается отдельно. Для новых каталогов показывается список файлов вместо полноценного diff.
+
+### ◆ Действия агента
+
+Лента работает **для Claude Code в активной области терминала**. Она читает его JSONL-транскрипт и показывает команды, изменения файлов, чтение, поиск, вызовы субагентов, web и MCP. Нажмите строку действия для подробностей; фильтры позволяют выбрать тип действия.
+
+`…` означает, что результат вызова ещё не получен; `✗` отмечает ошибку инструмента. В панель передаются последние 400 действий; в памяти хранится до 3000. Сообщение **В этой области Claude Code не запущен** нормально, если в активной области нет Claude, например там работает Codex.
+
+Сверху расположен блок **сеть**. Он проверяет прямое соединение и настроенные прокси, а также серверы и Keenetic, если они заданы. Действия в строке прокси:
+
+| Элемент | Действие |
+|---|---|
+| **⧉ копировать** | Копирует команду настройки переменных прокси в буфер обмена; для `direct` — команду их удаления |
+| **▶ claude** | Открывает новую сессию Claude в каталоге активной области через выбранный маршрут |
+| **▶ codex** | Открывает новую сессию Codex в том же каталоге через выбранный маршрут |
+| **✎ изменить прокси и серверы** | Переходит к сетевым настройкам |
+
+Буфер обмена после **⧉ копировать** содержит полный URL, включая пароль прокси, если он есть. Интерпретация результатов проверки описана в [справочнике настроек](docs/configuration.ru.md#что-означают-сетевые-индикаторы).
+
+### ◆ Сессии
+
+Во вкладке доступны **агенты**, **запущено**, **снимки** и ссылка **⚙ настройки**.
+
+1. В **агенты** выберите **Claude Code**, **Codex**, **pi** или **omp**.
+2. Выберите проект. Карточка текущего каталога помечается **здесь** и поднимается в начало списка.
+3. Используйте поиск по проекту или заголовку сессии. Внутри проекта поиск также учитывает ID.
+4. Нажмите **Продолжить** для продолжения или **＋ новая** для новой сессии.
+5. В строке **открывать:** выберите **окно** или **вкладка**.
+
+Проекты появляются из найденных файлов сессий. Чтобы начать работу в совершенно новом проекте, сначала запустите нужный CLI вручную в его каталоге; после сохранения сессии и следующего сканирования появится карточка проекта. Для Claude/Codex также доступен запуск из сетевого блока по текущему каталогу.
+
+Первое сканирование большой истории может занять десятки секунд: **Сканирование сессий…** следует дождаться. Затем используется дисковый кэш, а обновлённые файлы проверяются в фоне примерно раз в 20 секунд. В проекте отображаются первые 300 сессий после фильтрации.
+
+**Claude без запросов разрешений** добавляет `--dangerously-skip-permissions` только к запуску Claude. Встроенное значение по умолчанию — `false`; выбор в панели сохраняется в `localStorage` и может перекрывать значение из конфигурации. Режим открытия окна/вкладки также сохраняется в `localStorage`.
+
+Для сессии с меткой **запущена** первый клик меняет кнопку на **Уже запущена: повторите для копии**; повторный клик в течение трёх секунд запускает ещё один процесс с этой сессией. Для перехода к существующему процессу используйте **запущено → Перейти**.
+
+В **запущено** обнаруживаются Claude, терминальные процессы Codex и pi. `codex app-server` не включается, поэтому список не отражает все чаты Codex Desktop. Автоматического обнаружения работающего omp в этой версии нет. Процессы, приостановленные через Ctrl+Z, скрыты из списка. **Перейти** работает, когда процесс связан с областью iTerm2.
+
+Для pi повторное нажатие **Продолжить** блокируется, если в том же каталоге уже есть pi, включая приостановленный процесс. Его текущий ID недоступен для надёжной проверки; **＋ новая** остаётся доступным. Для новой сессии omp передаётся разовая настройка `autoResume: false`, чтобы кнопка действительно создала новую историю.
+
+### Снимки окон
+
+1. Откройте **снимки**.
+2. Введите имя, например `работа 11.10`, и нажмите **💾 это окно** или **💾 все окна**.
+3. Чтобы восстановить снимок, нажмите **Восстановить**, затем повторите клик в течение трёх секунд.
+
+Снимки сохраняются в `~/.config/itermsnap/snaps/` в формате TermDeck. Повторное сохранение того же имени оставляет предыдущий JSON в `.bak`.
+
+Учитывайте границы восстановления:
+
+- сохраняются названия вкладок, каталоги и ID Claude-сессий; автоматическое возобновление Codex/pi/omp при захвате не записывается;
+- вкладки всех захваченных окон восстанавливаются в **одном новом окне**;
+- захват записывает плоский список областей с вертикальным разделением, поэтому сложная исходная геометрия разделённых областей не сохраняется точно;
+- содержимое экрана терминала, произвольные работающие процессы и окружение командной оболочки не сохраняются;
+- переехавшие/удалённые каталоги автоматически не восстанавливаются.
+
+Автосохранение включено по умолчанию. Первая попытка — через минуту после старта, следующие — каждые пять минут. Новый снимок создаётся, только если структура изменилась и в ней есть хотя бы одна обнаруженная Claude-сессия. Сохраняются последние 20 файлов `auto-*`; закрытие всех окон не заменяет полезный снимок пустым.
+
+## Обслуживание
+
+Проверить состояние и вручную перезапустить сервис:
+
+```bash
+launchctl list dev.agentbelt
+launchctl kickstart -k "gui/$(id -u)/dev.agentbelt"
+```
+
+Обновить установленный форк при чистом рабочем дереве:
+
+```bash
+cd /Users/mizenko/Vibecode/agentbelt
+git status --short
+git pull --ff-only origin main
+./install.sh
+```
+
+Если `git status` показывает ваши изменения или pull сообщает о расхождении веток, сначала сохраните и согласуйте локальную работу. Установщик обновляет `pip` и `iterm2`, сохраняет конфигурацию и перезапускает LaunchAgent.
+
+Удалить автозапуск и остановить сервис:
+
+```bash
+cd /Users/mizenko/Vibecode/agentbelt
+./uninstall.sh
+```
+
+Скрипт переименовывает plist в `.removed`. Конфигурация, venv, репозиторий и снимки остаются на диске. При миграции со старого `iterm-toolbelt` установщик переносит конфигурацию и scan-cache, останавливает старый LaunchAgent и оставляет старый каталог.
+
+## Диагностика
+
+| Симптом | Что проверить |
+|---|---|
+| Нет вкладок agentbelt | iTerm2 запущен; Python API включён; скрипту разрешён доступ; нужные инструменты отмечены в View → Toolbelt |
+| **Панель не отвечает** | Наличие PID в `launchctl list dev.agentbelt`, локальный HTTP-сервис и журнал; после перезапуска iTerm2 дождитесь восстановления |
+| **Нет соединения с iTerm2** | Доступ к Python API и состояние сервиса; при необходимости выполните `kickstart` |
+| Пустые проекты | CLI уже сохранил JSONL-сессию в ожидаемом каталоге; дождитесь фонового сканирования |
+| Нет действий Codex | Лента «Действия агента» в этой версии предназначена для Claude Code |
+| Нет PR/CI | `gh auth status`, репозиторий на GitHub и доступность `gh`; кэш PR обновляется примерно раз в минуту |
+| Агент не запускается / command not found | Запустите `command -v claude` или `command -v codex` в новом окне iTerm2; проверьте PATH и настройки командной оболочки, выбранный прокси и параметры запуска |
+| **Не удалось запустить … через …** | Имя прокси выбрано в настройках, но отсутствует в списке «Прокси»; исправьте выбор и нажмите «Сохранить» |
+| **Каталог не существует** | Проект перемещён или удалён; старый путь в истории автоматически не переписывается |
+| pi сообщает о занятом проекте | Закройте или продолжите существующий pi; при Ctrl+Z он скрыт из списка запущенных, но «Продолжить» всё равно блокируется |
+| Не создаётся автоматический снимок | Автосохранение включено, структура изменена и есть обнаруженная Claude-сессия; один работающий Codex этого условия не выполняет |
+| Порт занят | Остановите второй экземпляр или задайте другой `port` в config.json и перезапустите сервис |
+| Ошибка JSON после ручной правки | Проверьте синтаксис; при невалидном JSON приложение загружает встроенные значения по умолчанию |
+
+Безопасная проверка локальной HTML-страницы, не выводящая историю сессий:
+
+```bash
+curl --noproxy '*' -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:47811/sessions
+lsof -nP -iTCP:47811 -sTCP:LISTEN
+```
+
+Если порт изменён, подставьте новое значение. Журнал находится в `~/.config/agentbelt/agentbelt.log`:
+
+```bash
+tail -n 80 ~/.config/agentbelt/agentbelt.log
+```
+
+Журнал и JSON-ответы могут содержать приватные пути и ID сессий: перед публикацией проверьте их содержимое. Не публикуйте полный `config.json`, файлы авторизации агентов и scan-cache.
+
+После разрыва соединения с iTerm2 процесс завершает работу, освобождает HTTP-порт и перезапускается через `launchd`. Задержка запуска может составить около 10 секунд; iTerm2 должен снова быть доступен. У вручную запущенного скрипта такого автоматического восстановления нет.
+
+## Лицензия
+
+MIT, см. [оригинальный текст LICENSE](LICENSE) и [перевод на русский](LICENSE.ru.md).

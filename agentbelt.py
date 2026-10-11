@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""agentbelt: an iTerm2 sidebar for AI coding agents (Claude Code, Codex, pi, omp).
+"""agentbelt: боковая панель iTerm2 для AI-агентов (Claude Code, Codex, pi, omp).
 
-Tabs (View → Toolbelt):
-  ◆ Git & PR         branch, ahead/behind, changed files with diffs, PR and CI, worktrees
-  ◆ Agent actions    what Claude Code is doing in the active pane: commands, edits, reads
-  ◆ Sessions         Claude Code, Codex, pi and omp sessions: projects, resume, running agents
-  Settings (⚙ in the Sessions tab): agent proxy and flags, tabs, repo checks
+Вкладки (View → Toolbelt):
+  ◆ Git и PR          ветка, изменения файлов, PR, CI и рабочие деревья
+  ◆ Действия агента   команды, правки и чтение Claude Code в активной области
+  ◆ Сессии            проекты, продолжение сессий и работающие агенты
+  Настройки (⚙ во вкладке «Сессии»): прокси, параметры запуска, вкладки и проверки
 
-Pages are served by an HTTP server on 127.0.0.1 (port from the config) and shown by iTerm2
-in Toolbelt tabs. Everything iTerm-related (active pane, new windows) goes through its Python API.
-Config: ~/.config/agentbelt/config.json.
+HTTP-сервер на 127.0.0.1 отдаёт страницы для боковой панели; порт берётся из настроек.
+Доступ к активной области и создание окон выполняются через Python API iTerm2.
+Конфигурация: ~/.config/agentbelt/config.json.
 """
 import asyncio
 import copy
@@ -122,7 +122,7 @@ async def run(cmd: list[str], cwd: str | None = None, timeout: float = 10.0) -> 
             p and p.kill()
         except Exception:  # noqa: BLE001
             pass
-        return 124, "timeout"
+        return 124, "Превышено время ожидания"
     except Exception as e:  # noqa: BLE001
         return 1, str(e)
 
@@ -385,20 +385,20 @@ async def file_diff(path: str) -> str:
     root = root.strip()
     _, st = await run(["git", "status", "--porcelain=v1", "--", path], root)
     if not st.strip():
-        return "(no changes)"
+        return "(нет изменений)"
     if st.startswith("??") and path.endswith("/"):
         _, ls = await run(["git", "ls-files", "--others", "--exclude-standard", "--", path], root)
         names = ls.splitlines()
-        return f"untracked directory, files: {len(names)}\n" + "\n".join(names[:300])
+        return f"Неотслеживаемый каталог, файлов: {len(names)}\n" + "\n".join(names[:300])
     if st.startswith("??"):
         try:
             with open(os.path.join(root, path), "r", encoding="utf-8", errors="replace") as f:
                 body = f.read(200_000)
             return "".join("+" + l + "\n" for l in body.splitlines())
         except OSError as e:
-            return f"(cannot read: {e})"
+            return f"(не удалось прочитать: {e})"
     _, d = await run(["git", "diff", "HEAD", "--no-color", "--", path], root, timeout=10)
-    return d[:400_000] or "(empty diff)"
+    return d[:400_000] or "(нет различий)"
 
 
 # ─────────────── Agent actions tab ───────────────
@@ -448,7 +448,7 @@ def _detail(name: str, inp: dict) -> str:
             parts += ["+" + l for l in (ed.get("new_string") or "").splitlines()] + ["@@"]
         return "\n".join(parts)
     if name == "Write":
-        return "\n".join(["@@ " + g("file_path", "") + " (new/overwritten)"] +
+        return "\n".join(["@@ " + g("file_path", "") + " (создан/перезаписан)"] +
                          ["+" + l for l in (g("content") or "").splitlines()[:400]])
     return json.dumps(inp, ensure_ascii=False, indent=1)[:20000]
 
@@ -834,15 +834,15 @@ async def _pi_processes(ps: str) -> list | None:
 async def _pi_resume_guard(d: str) -> str:
     """Pi does not expose its current session ID, so guard the whole project."""
     if not d:
-        return "choose a project before resuming pi"
+        return "Перед продолжением pi выберите проект"
     rc, ps = await run(["ps", "-xo", "pid=,tty=,stat=,command="], timeout=5)
     if rc:
-        return "could not check running pi processes"
+        return "Не удалось проверить работающие процессы pi"
     agents = await _pi_processes(ps)
     if agents is None:
-        return "could not check running pi processes"
+        return "Не удалось проверить работающие процессы pi"
     if any(_same_dir(a["dir"], d) for a in agents):
-        return "pi is already running in this project; close it before resuming"
+        return "pi уже работает в этом проекте; закройте его перед продолжением"
     return ""
 
 
@@ -999,7 +999,7 @@ def agent_command(tool: str, sid: str, skip: bool, proxy: str = "") -> str | Non
 async def open_agent(q: dict) -> str:
     sid, tool, d = q.get("id", ""), q.get("tool", ""), q.get("dir", "")
     if sid and not SAFE_ID.match(sid):
-        return "bad id"
+        return "Некорректный ID"
     if q.get("proxy"):
         # launched from the network block: current pane's directory, settings from Sessions
         d = d or STATE["cwd"] or ""
@@ -1007,22 +1007,22 @@ async def open_agent(q: dict) -> str:
         q.setdefault("where", CFG.get("open_in", "window"))
     cmd = agent_command(tool, sid, q.get("skip") == "1", q.get("proxy", ""))
     if not cmd:
-        return f"cannot launch {tool}" + (f" via {q['proxy']}" if q.get("proxy") else "")
+        return f"Не удалось запустить {tool}" + (f" через {q['proxy']}" if q.get("proxy") else "")
     if d and not os.path.isdir(d):
-        return f"no such directory: {d}"
+        return f"Каталог не существует: {d}"
     conn = CONN.get("c")
     if conn is None:
-        return "no connection to iTerm"
+        return "Нет соединения с iTerm2"
     reservation = None
     if tool == "pi" and sid:
         if not d:
-            return "choose a project before resuming pi"
+            return "Перед продолжением pi выберите проект"
         try:
             reservation = _reserve_pi_resume(d)
         except OSError:
-            return f"no such directory: {d}"
+            return f"Каталог не существует: {d}"
         if reservation is None:
-            return "pi is already starting in this project"
+            return "pi уже запускается в этом проекте"
     sent = False
     try:
         if reservation:
@@ -1053,10 +1053,10 @@ async def open_agent(q: dict) -> str:
             except Exception:  # noqa: BLE001
                 sess = None
         if not sess:
-            return "iTerm did not return the new session"
+            return "iTerm2 не вернул новую сессию"
         await asyncio.sleep(0.3)
         if reservation and not _renew_pi_resume(reservation):
-            return "pi resume request expired; retry"
+            return "Запрос продолжения pi истёк; повторите попытку"
         sent = True  # sending may succeed even if iTerm reports an error afterward
         await sess.async_send_text((f"cd {shlex.quote(d)} && " if d else "") + cmd + "\n")
         await sess.async_activate(select_tab=True, order_window_front=True)
@@ -1070,7 +1070,7 @@ async def focus_tty(tty: str) -> str:
     """Switch to the iTerm pane where the agent runs (by tty)."""
     conn = CONN.get("c")
     if conn is None or not tty:
-        return "no connection to iTerm"
+        return "Нет соединения с iTerm2"
     app = await iterm2.async_get_app(conn)
     for w in app.terminal_windows:
         for t in w.tabs:
@@ -1083,7 +1083,7 @@ async def focus_tty(tty: str) -> str:
                     await s.async_activate(select_tab=True, order_window_front=True)
                     await app.async_activate()
                     return "ok"
-    return "this window is not in iTerm"
+    return "Это окно не найдено в iTerm2"
 
 
 # ─────────────── window snapshots (TermDeck format) ───────────────
@@ -1168,11 +1168,11 @@ def _write_snap(name: str, tabs: list):
 
 async def snap_save(name: str, only_current: bool = False) -> str:
     if not SAFE_SNAP.match(name or ""):
-        return "name: letters, digits, space, . : - up to 60 chars"
+        return "Имя: буквы, цифры, пробел, . : -; до 60 символов"
     app = await iterm2.async_get_app(CONN["c"])
     tabs = await capture_windows(app, only_current)
     if not tabs:
-        return "nothing to save: no windows with directories"
+        return "Нечего сохранять: нет окон с известными каталогами"
     _write_snap(name, tabs)
     return "ok"
 
@@ -1223,12 +1223,12 @@ async def _wait_shell(app, session_id: str):
 
 async def snap_restore(name: str, skip: bool) -> str:
     if not SAFE_SNAP.match(name or ""):
-        return "bad name"
+        return "Некорректное имя"
     try:
         with open(os.path.join(SNAP_DIR, name + ".json")) as f:
             tabs = json.load(f)
     except (OSError, ValueError):
-        return "no such snapshot"
+        return "Снимок не найден"
     conn = CONN["c"]
     app = await iterm2.async_get_app(conn)
     # the TermDeck profile (if present) keeps claude from overwriting tab names
@@ -1296,11 +1296,11 @@ def _save_network(new: dict, cfg: dict) -> str | None:
             if not name and not url:
                 continue
             if not name or name in seen or name == "direct":
-                return f"proxy name «{name}» is empty, taken or reserved"
+                return f"Имя прокси «{name}» пустое, занято или зарезервировано"
             if "***" in url:  # untouched masked URL: keep the stored one
                 url = old.get(px.get("orig") or name, "")
             if not PROXY_URL.match(url):
-                return f"proxy «{name}»: expected scheme://[user:pass@]host:port"
+                return f"Прокси «{name}»: ожидается scheme://[user:pass@]host:port"
             seen.add(name)
             out.append({"name": name, "url": url})
         cfg["proxies"] = out
@@ -1312,7 +1312,7 @@ def _save_network(new: dict, cfg: dict) -> str | None:
             try:
                 port = int(sv.get("port") or 22)
             except (TypeError, ValueError):
-                return f"server «{sv.get('name')}»: port must be a number"
+                return f"Сервер «{sv.get('name')}»: порт должен быть числом"
             item = {"name": str(sv.get("name") or sv["host"]).strip(), "host": str(sv["host"]).strip(), "port": port}
             if sv.get("banner") is False:
                 item["banner"] = False
@@ -1333,9 +1333,9 @@ def settings_save(body: bytes) -> str:
     try:
         new = json.loads(body or b"{}")
     except ValueError:
-        return "not JSON"
+        return "Некорректный JSON"
     if not isinstance(new, dict):
-        return "not an object"
+        return "Ожидается JSON-объект"
     cfg = load_config()
     restart = False
     for k in ("open_in", "title_prefix", "onboarded", "auto_show_toolbelt", "autosave"):
@@ -1607,7 +1607,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
             out = json.dumps(settings_state(), ensure_ascii=False).encode()
         elif u.path in ("/sessions/open", "/sessions/focus", "/settings/save", "/snaps/save", "/snaps/restore",
                         "/net/copy", "/open-url") and not mutating:
-            out, ctype, status = b"forbidden", "text/plain", b"403 Forbidden"
+            out, ctype, status = "Доступ запрещён".encode(), "text/plain; charset=utf-8", b"403 Forbidden"
         elif u.path == "/open-url":
             url = qs.get("url", "")
             try:
@@ -1617,10 +1617,10 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
             ctype = "text/plain; charset=utf-8"
             if (not parsed or parsed.scheme not in ("http", "https") or not parsed.hostname
                     or re.search(r"[\x00-\x20\x7f]", url)):
-                out, status = b"invalid URL", b"400 Bad Request"
+                out, status = "Некорректный URL".encode(), b"400 Bad Request"
             else:
                 rc, res = await run(["/usr/bin/open", url])
-                out = b"ok" if rc == 0 else ("could not open URL: " + res.strip()).encode()
+                out = b"ok" if rc == 0 else ("Не удалось открыть URL: " + res.strip()).encode()
                 if rc:
                     status = b"502 Bad Gateway"
         elif u.path == "/net/copy":
@@ -1632,25 +1632,25 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
                 await p.communicate((line + "\n").encode())
                 res = "copied"
             else:
-                res = "unknown proxy"
+                res = "Неизвестный прокси"
             out, ctype = res.encode(), "text/plain; charset=utf-8"
         elif u.path == "/sessions/open":
             try:
                 res = await open_agent(qs)
             except Exception as ex:  # noqa: BLE001
-                res = f"error: {type(ex).__name__}: {ex}"
-            print(time.strftime("%H:%M:%S"), "open", qs.get("tool"), qs.get("id") or "(new)", "->", res, flush=True)
+                res = f"Ошибка: {type(ex).__name__}: {ex}"
+            print(time.strftime("%H:%M:%S"), "запуск", qs.get("tool"), qs.get("id") or "(новая)", "->", res, flush=True)
             out, ctype = res.encode(), "text/plain; charset=utf-8"
         elif u.path == "/sessions/focus":
             tty = qs.get("tty", "")
-            res = await focus_tty(tty) if re.fullmatch(r"ttys?\d+", tty) else "bad tty"
+            res = await focus_tty(tty) if re.fullmatch(r"ttys?\d+", tty) else "Некорректный tty"
             out, ctype = res.encode(), "text/plain; charset=utf-8"
         elif u.path in ("/snaps/save", "/snaps/restore"):
             try:
                 res = await (snap_save(qs.get("name", ""), qs.get("scope") == "window") if u.path == "/snaps/save"
                              else snap_restore(qs.get("name", ""), qs.get("skip") == "1"))
             except Exception as ex:  # noqa: BLE001
-                res = f"error: {type(ex).__name__}: {ex}"
+                res = f"Ошибка: {type(ex).__name__}: {ex}"
             print(time.strftime("%H:%M:%S"), u.path, qs.get("name"), "->", res, flush=True)
             out, ctype = res.encode(), "text/plain; charset=utf-8"
         elif u.path == "/settings/save":
@@ -1658,7 +1658,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
             restart = res == "restart"
             out, ctype = res.encode(), "text/plain; charset=utf-8"
         else:
-            out, ctype, status = b"not found", "text/plain", b"404 Not Found"
+            out, ctype, status = "Не найдено".encode(), "text/plain; charset=utf-8", b"404 Not Found"
         writer.write(b"HTTP/1.1 " + status + b"\r\nContent-Type: " + ctype.encode() +
                      b"\r\nCache-Control: no-store\r\nContent-Length: " + str(len(out)).encode() +
                      b"\r\nConnection: close\r\n\r\n" + out)
@@ -1695,8 +1695,8 @@ async def ensure_toolbelt(app, connection):
         pass
 
 
-TABS = [("git", "Git & PR", "/"), ("agent", "Agent actions", "/agent"),
-        ("sessions", "Sessions", "/sessions"), ("settings", "Settings", "/settings")]
+TABS = [("git", "Git и PR", "/"), ("agent", "Действия агента", "/agent"),
+        ("sessions", "Сессии", "/sessions"), ("settings", "Настройки", "/settings")]
 
 
 async def iterm_session(connection):
@@ -1751,7 +1751,7 @@ async def main(connection):
     try:
         done, _ = await asyncio.wait((session, closed), return_when=asyncio.FIRST_COMPLETED)
         if closed in done:
-            print(time.strftime("%H:%M:%S"), "iTerm connection closed; exiting for launchd to restart", flush=True)
+            print(time.strftime("%H:%M:%S"), "Соединение с iTerm2 закрыто; завершение для перезапуска через launchd", flush=True)
         else:
             session.result()
     finally:

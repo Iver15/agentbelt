@@ -6,6 +6,6 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 if [ -f "$PLIST" ]; then
   mv "$PLIST" "$PLIST.removed"
-  echo "autostart removed ($PLIST.removed)"
+  echo "Автозапуск удалён ($PLIST.removed)"
 fi
-echo "config and venv are left in ${AGENTBELT_HOME:-$HOME/.config/agentbelt}; delete them by hand if not needed"
+echo "Конфигурация и окружение Python сохранены в ${AGENTBELT_HOME:-$HOME/.config/agentbelt}; при необходимости удалите их вручную"

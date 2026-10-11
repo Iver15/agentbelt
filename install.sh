@@ -13,15 +13,15 @@ LABEL="dev.agentbelt"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME_DIR/agentbelt.log"
 
-[ "$(uname)" = "Darwin" ] || { echo "macOS required"; exit 1; }
-[ -d "/Applications/iTerm.app" ] || echo "! iTerm2 not found in /Applications, continuing"
+[ "$(uname)" = "Darwin" ] || { echo "Требуется macOS"; exit 1; }
+[ -d "/Applications/iTerm.app" ] || echo "! iTerm2 не найден в /Applications, установка продолжается"
 # python 3.10+ (the code uses `X | None`); a bare ssh or launchd PATH often finds only Xcode's 3.9
 PY=""
 for c in python3 /opt/homebrew/bin/python3 /usr/local/bin/python3 python3.14 python3.13 python3.12 python3.11 python3.10; do
   p="$(command -v "$c" 2>/dev/null || true)"
   if [ -n "$p" ] && "$p" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null; then PY="$p"; break; fi
 done
-[ -n "$PY" ] || { echo "python 3.10+ required (brew install python)"; exit 1; }
+[ -n "$PY" ] || { echo "Требуется Python 3.10+ (brew install python)"; exit 1; }
 
 mkdir -p "$HOME_DIR" "$HOME/Library/LaunchAgents"
 
@@ -29,16 +29,16 @@ mkdir -p "$HOME_DIR" "$HOME/Library/LaunchAgents"
 if [ -f "$OLD_DIR/config.json" ] && [ ! -f "$HOME_DIR/config.json" ]; then
   cp -p "$OLD_DIR/config.json" "$HOME_DIR/config.json"
   [ -f "$OLD_DIR/scan-cache.json" ] && cp -p "$OLD_DIR/scan-cache.json" "$HOME_DIR/"
-  echo "· config copied from $OLD_DIR (the old directory is left as is)"
+  echo "· Конфигурация скопирована из $OLD_DIR (старый каталог сохранён)"
 fi
 OLD_PLIST="$HOME/Library/LaunchAgents/$OLD_LABEL.plist"
 if [ -f "$OLD_PLIST" ]; then
   launchctl bootout "gui/$(id -u)/$OLD_LABEL" 2>/dev/null || true
   mv "$OLD_PLIST" "$OLD_PLIST.removed"
-  echo "· old service $OLD_LABEL stopped"
+  echo "· Старый сервис $OLD_LABEL остановлен"
 fi
 if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null; then
-  echo "· venv: $VENV ($("$PY" --version))"
+  echo "· Окружение Python: $VENV ($("$PY" --version))"
   "$PY" -m venv --clear "$VENV"
 fi
 "$VENV/bin/pip" install -q --upgrade pip iterm2
@@ -46,7 +46,7 @@ fi
 if [ ! -f "$HOME_DIR/config.json" ]; then
   cp "$REPO/config.example.json" "$HOME_DIR/config.json"
   chmod 600 "$HOME_DIR/config.json"
-  echo "· config: $HOME_DIR/config.json"
+  echo "· Конфигурация: $HOME_DIR/config.json"
 fi
 
 cat > "$PLIST.tmp" <<EOF
@@ -75,14 +75,14 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
 cat <<EOF
 
-Done. Left to do in iTerm2:
-  1. Settings → General → Magic → Enable Python API (if not enabled yet).
-     On first run iTerm asks to allow the script: allow it.
-  2. View → Toolbelt → tick "◆ Git & PR", "◆ Agent actions", "◆ Sessions".
-     Show/hide the Toolbelt: ⌘⇧B.
-  3. The ⚙ button in "◆ Sessions": intro and proxy settings for agents.
+Установка завершена. Настройте iTerm2:
+  1. Settings → General → Magic → Enable Python API (если ещё не включено).
+     При первом запуске iTerm2 запросит доступ для скрипта: разрешите его.
+  2. View → Toolbelt → включите «◆ Git и PR», «◆ Действия агента», «◆ Сессии».
+     Показать или скрыть панель: ⌘⇧B.
+  3. Кнопка ⚙ во вкладке «◆ Сессии»: инструкция и настройки агентов.
 
-Log: $LOG
-Restart: launchctl kickstart -k gui/\$(id -u)/$LABEL
-Uninstall: $REPO/uninstall.sh
+Журнал: $LOG
+Перезапуск: launchctl kickstart -k gui/\$(id -u)/$LABEL
+Удаление: $REPO/uninstall.sh
 EOF

@@ -9,7 +9,13 @@ $w = 460
 $edge = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
           "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 $profile = Join-Path $env:LOCALAPPDATA "agentbelt\edge-profile"
+# already open (the keeper restarted the server): leave the window and its dock alone
+if (Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*--app=*$profile*" }) { return }
 Start-Process -FilePath $edge -ArgumentList @(
     "--app=http://127.0.0.1:$port/belt", "--user-data-dir=$profile",
     "--window-size=$w,$($wa.Height)", "--window-position=$($wa.Right - $w),$($wa.Top)",
     "--no-first-run", "--disable-features=Translate")
+
+# reserve the strip so maximized windows stop at the belt; the docker lives as long as the window
+Start-Process -FilePath "conhost.exe" -WindowStyle Hidden -ArgumentList @(
+    "--headless", "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "dock-belt.ps1"), "-Width", $w)

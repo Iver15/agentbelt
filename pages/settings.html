@@ -23,7 +23,7 @@ pre{margin:4px 0 0;font:11px/1.35 "SF Mono",Menlo,monospace;white-space:pre-wrap
 let C=null, V=null;
 const e=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const maskUrl=s=>String(s||"").replace(/(:\/\/[^:\/\s@]+):([^@\s]+)@/g,"$1:***@");
-const TABS={git:"Git и PR",agent:"Действия агента",sessions:"Сессии",settings:"Настройки"};
+const TABS={git:"Git и PR",agent:"Действия агента",connections:"Подключения",sessions:"Сессии",settings:"Настройки"};
 const EXTRA_AGENTS=[["pi","pi","pi --session <id>"],["omp","omp","omp -r <id>"]];
 const via=a=>a.proxy==="direct"?"env -u HTTPS_PROXY …":a.proxy?`HTTPS_PROXY=<${a.proxy}>`:a.prefix;
 function preview(){const a=C.agents.claude, x=C.agents.codex;
@@ -69,7 +69,7 @@ function render(d){C=d.config;
    <div class="mut">После изменения вкладок сервис автоматически перезапустится при сохранении</div></div>`;
   const kn=C.keenetic||{};
   h+=`<div class="s" id="network"><h3>Сеть</h3>
-   <div class="mut">Прокси проверяются раз в минуту по API агентов. Во вкладке «Действия агента» доступны ⧉ копировать / ▶ claude / ▶ codex. Данные хранятся локально; пароли в URL прокси маскируются и сохраняются, пока вы не введёте новый URL.</div>
+   <div class="mut"><a href="/connections">Открыть «Подключения»</a>: удобное добавление, проверка и выбор прокси для Claude и Codex. Здесь доступны расширенные настройки. Данные хранятся локально; пароли в URL прокси маскируются и сохраняются, пока вы не введёте новый URL.</div>
    <div class="card"><b>Прокси</b><div id="pxs">${(C.proxies||[]).map(pxRow).join("")}</div><button id="addpx">+ прокси</button></div>
    <div class="card"><b>Серверы</b> <span class="mut">Ping и TCP-проверка с этого Mac; отключите чтение приветствия для портов без SSH (MTProto, VPN)</span><div id="svs">${(C.servers||[]).map(svRow).join("")}</div><button id="addsv">+ сервер</button></div>
    <div class="card"><b>Роутер Keenetic</b> <span class="mut">Необязательно: туннели и маршруты доменов через RCI; пустой адрес отключает проверку</span>

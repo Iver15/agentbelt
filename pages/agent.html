@@ -50,8 +50,8 @@ tick();setInterval(tick,1000);
 // ── network: the proxy this claude runs through, proxy liveness, foreign servers
 const nd=document.getElementById("net");try{nd.open=localStorage.getItem("net")!=="0"}catch(_){nd.open=true}
 nd.addEventListener("toggle",()=>{try{localStorage.setItem("net",nd.open?"1":"0")}catch(_){}});
-const api=r=>!r||!r.code?`<span class="bad">недоступен</span>`:r.code===403?`<span class="warn">403 ${r.ms} мс</span>`:r.code<500?`<span class="ok">${r.ms} мс</span>`:`<span class="warn">${r.code}</span>`;
-const up=r=>r&&r.code&&r.code!==403&&r.code<500;
+const up=r=>r&&r.code>=200&&(r.code<400||r.code===401);
+const api=r=>!r||!r.code?`<span class="bad">недоступен</span>`:up(r)?`<span class="ok">${r.ms} мс</span>`:`<span class="warn">${r.code}${r.ms!=null?' · '+r.ms+' мс':''}</span>`;
 // a proxy is alive when every agent CLI can reach its API through it
 const alive=p=>!!(p&&p.res&&Object.values(p.res).length&&Object.values(p.res).every(up));
 async function net(){try{const d=await (await fetch("/net/state")).json();const pr=d.probe;
@@ -77,7 +77,7 @@ async function net(){try{const d=await (await fetch("/net/state")).json();const 
       for(const s of pr.servers){const st=(s.banner||(s.nobanner&&s.tcp!==null))?"ok":s.tcp!==null?"warn":"bad";
         h+=`<tr><td class="n" title="${e(s.host)}:${s.port}"><span class="${st}">●</span> ${e(s.name)}</td><td>${s.ping!==null?s.ping+" мс":'<span class="mut">—</span>'}</td><td class="${st}">${(s.banner||s.nobanner)&&s.tcp!==null?s.tcp+" мс":s.tcp!==null?"открыт, без приветствия":"закрыт"}</td></tr>`}
       h+=`</table>`}
-    h+=`<div class="mut">Проверено: ${new Date(pr.at*1000).toLocaleTimeString("ru-RU")}, с этого Mac · <a href="/settings#network" style="color:var(--acc);text-decoration:none">✎ изменить прокси и серверы</a></div>`}
+    h+=`<div class="mut">Проверено: ${new Date(pr.at*1000).toLocaleTimeString("ru-RU")}, с этого Mac · <a href="/connections" style="color:var(--acc);text-decoration:none">Подключения и выбор прокси</a> · <a href="/settings#network" style="color:var(--acc);text-decoration:none">серверы</a></div>`}
   nd.querySelector("summary").innerHTML=sum;document.getElementById("netb").innerHTML=h}catch(_){}}
 net();setInterval(net,5000);
 // proxy actions: the export line (with the password) is put on the clipboard by the service, not shown here

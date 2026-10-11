@@ -1,6 +1,6 @@
 # Архитектура и разработка agentbelt
 
-Описание относится к macOS-ветке `main`, коммит `c859464`. [Руководство пользователя](../README.md) и [справочник настроек](configuration.ru.md).
+Описание относится к macOS-ветке `main` и включает первый этап экрана «Подключения». Исходная база изучения — коммит `c859464`. [Руководство пользователя](../README.md) и [справочник настроек](configuration.ru.md).
 
 ## Устройство проекта
 
@@ -13,6 +13,8 @@
 | [`pages/agent.html`](../pages/agent.html) | Лента Claude и сетевой блок |
 | [`pages/sessions.html`](../pages/sessions.html) | Проекты, истории, работающие агенты, снимки |
 | [`pages/settings.html`](../pages/settings.html) | Формы настроек и предпросмотр запуска |
+| [`pages/connections.html`](../pages/connections.html) | Выбор маршрута, добавление и проверки Claude/Codex |
+| [`resources/feather/LICENSE`](../resources/feather/LICENSE) | MIT-лицензия локальных иконок Feather 4.29.2 |
 | [`config.example.json`](../config.example.json) | Шаблон первой установки с демонстрационной сетью |
 | [`install.sh`](../install.sh), [`uninstall.sh`](../uninstall.sh) | venv, конфигурация и LaunchAgent |
 | [`resources/omp-new-session.yml`](../resources/omp-new-session.yml) | Разовая настройка для новой omp-сессии |
@@ -105,6 +107,9 @@ flowchart TD
 | GET | `/snaps/state` | Список снимков и автосохранение |
 | GET | `/net/state` | Сеть; может инициировать внешние проверки |
 | GET | `/settings/state` | Конфигурация для интерфейса с маскированием URL прокси и без пароля Keenetic |
+| GET | `/connections/state` | Назначения Claude/Codex, адреса без учётных данных и результаты проверок; не возвращает prefix/flags |
+| POST | `/connections/check` | JSON: `name` существующего маршрута или `proxy` для предварительной проверки; не сохраняет конфигурацию |
+| POST | `/connections/save` | JSON: новый `proxy` и/или `defaults` для Claude/Codex; атомарная запись после валидации |
 | POST | `/sessions/open` | Новая/возобновлённая сессия; параметры tool, id, dir, skip, where, proxy |
 | POST | `/sessions/focus?tty=<tty>` | Переключение на область iTerm2 |
 | POST | `/snaps/save?name=<name>&scope=window` | Снимок текущего окна; scope=all — всех окон |
@@ -112,6 +117,8 @@ flowchart TD
 | POST | `/settings/save` | JSON-тело конфигурации |
 | POST | `/net/copy?name=<proxy>` | Полная export/unset-команда в буфер обмена |
 | POST | `/open-url?url=<url>` | HTTP(S)-ссылка в браузере по умолчанию |
+
+Ошибки `/connections/check` и `/connections/save` возвращают HTTP 400 и JSON `{ "ok": false, "error": "…" }`. Назначения проверяются по списку маршрутов после добавления, поэтому новый прокси и его назначения можно сохранить атомарно. Неизвестное назначение отклоняет весь запрос. Проверка перед добавлением сохраняет результат только в памяти; кэш связан с именем и полным URL, чтобы смена учётных данных не показывала старый результат. Результаты не содержат URL с секретами. Иконки обслуживаются по точному списку путей `/assets/feather/*.svg`.
 
 Все POST-действия требуют `X-Toolbelt: 1`, иначе возвращается 403. Большинство логических ошибок возвращаются текстом с HTTP 200: клиент проверяет тело (`ok`, `copied`, `restart` или описание ошибки). У `/open-url` дополнительно есть HTTP 400/502. Успешная отправка команды в командную оболочку не является проверкой успешного запуска или входа CLI.
 

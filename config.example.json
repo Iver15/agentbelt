@@ -1,7 +1,7 @@
 {
   "port": 47811,
   "title_prefix": "◆ ",
-  "tabs": {"git": true, "agent": true, "sessions": true, "settings": false},
+  "tabs": {"git": true, "agent": true, "connections": true, "sessions": true, "settings": false},
   "open_in": "window",
   "agents": {
     "claude": {"prefix": "", "flags": "", "skip_permissions": false, "proxy": "eu-1"},

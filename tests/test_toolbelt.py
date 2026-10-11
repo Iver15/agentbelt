@@ -500,8 +500,8 @@ def test_active_agents_includes_pi_without_a_terminal_but_not_suspended(t, monke
 
 
 def test_proxy_prefix_and_export(t):
-    assert t.proxy_prefix("eu-1") == "HTTPS_PROXY=http://user:s3cret@203.0.113.10:3128 " \
-                                     "HTTP_PROXY=http://user:s3cret@203.0.113.10:3128"
+    assert t.proxy_prefix("eu-1").startswith("HTTPS_PROXY=http://user:s3cret@203.0.113.10:3128 "
+                                            "HTTP_PROXY=http://user:s3cret@203.0.113.10:3128 ")
     assert t.proxy_prefix("direct").startswith("env -u HTTPS_PROXY")
     assert t.proxy_prefix("nope") is None
     assert t.proxy_export("eu-1").startswith("export HTTPS_PROXY=")

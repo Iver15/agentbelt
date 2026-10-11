@@ -38,7 +38,7 @@ BOOT = str(int(time.time()))
 DEFAULTS = {
     "port": 47811,
     "title_prefix": "◆ ",
-    "tabs": {"git": True, "agent": True, "sessions": True, "settings": False},
+    "tabs": {"git": True, "agent": True, "connections": True, "sessions": True, "settings": False},
     "open_in": "window",
     "agents": {
         "claude": {"prefix": "", "flags": "", "skip_permissions": False},
@@ -93,7 +93,7 @@ def save_config(cfg: dict):
 CFG = load_config()
 
 NOPROXY_ENV = {k: v for k, v in os.environ.items()
-               if k.lower() not in ("https_proxy", "http_proxy", "all_proxy")}
+               if k.lower() not in ("https_proxy", "http_proxy", "all_proxy", "no_proxy")}
 NOPROXY_ENV["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:" + NOPROXY_ENV.get("PATH", "")
 NOPROXY_ENV["GH_PROMPT_DISABLED"] = "1"
 NOPROXY_ENV["GIT_TERMINAL_PROMPT"] = "0"
@@ -953,7 +953,8 @@ def proxy_prefix(name: str) -> str | None:
     if not url:
         return None
     q = shlex.quote(url)
-    return f"HTTPS_PROXY={q} HTTP_PROXY={q}"
+    # Lowercase variables can win over uppercase, and NO_PROXY can bypass the route.
+    return f"HTTPS_PROXY={q} HTTP_PROXY={q} env -u https_proxy -u http_proxy -u ALL_PROXY -u all_proxy -u NO_PROXY -u no_proxy"
 
 
 def proxy_export(name: str) -> str | None:
@@ -961,7 +962,7 @@ def proxy_export(name: str) -> str | None:
     if name == "direct":
         return "unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy"
     p = proxy_prefix(name)
-    return p and "export " + p
+    return p and "export " + p.split(" env -u ", 1)[0] + "; unset https_proxy http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy"
 
 
 def agent_command(tool: str, sid: str, skip: bool, proxy: str = "") -> str | None:
@@ -1281,9 +1282,6 @@ def settings_state() -> dict:
     return {"v": BOOT, "version": VERSION, "config": cfg, "config_file": CONFIG_FILE}
 
 
-PROXY_URL = re.compile(r"^(https?|socks5h?)://([^\s/@]+@)?[\w.-]+:\d{1,5}/?$")
-
-
 def _save_network(new: dict, cfg: dict) -> str | None:
     """Proxies, servers and the router from the Settings page. Returns an error or None."""
     if isinstance(new.get("proxies"), list):
@@ -1299,8 +1297,10 @@ def _save_network(new: dict, cfg: dict) -> str | None:
                 return f"Имя прокси «{name}» пустое, занято или зарезервировано"
             if "***" in url:  # untouched masked URL: keep the stored one
                 url = old.get(px.get("orig") or name, "")
-            if not PROXY_URL.match(url):
-                return f"Прокси «{name}»: ожидается scheme://[user:pass@]host:port"
+            try:
+                _connection_proxy({"name": name, "url": url}, {"proxies": []})
+            except ValueError as ex:
+                return f"Прокси «{name}»: ожидается scheme://[user:pass@]host:port; {ex}"
             seen.add(name)
             out.append({"name": name, "url": url})
         cfg["proxies"] = out
@@ -1416,12 +1416,13 @@ async def _curl(proxy: str, url: str) -> dict:
     p = None
     try:
         p = await asyncio.create_subprocess_exec(
-            "curl", "-s", "-o", "/dev/null", "-m", "8", "-w", "%{http_code} %{time_total}", "-K", "-",
+            "curl", "-s", "-o", "/dev/null", "-m", "8", "-w", "%{http_code} %{time_total} %{http_connect}", "-K", "-",
             env=NOPROXY_ENV, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
         out, _ = await asyncio.wait_for(p.communicate(conf.encode()), 12)
-        code, t = (out.decode().split() + ["0", "0"])[:2]
-        return {"code": int(code), "ms": round(float(t) * 1000)}
+        code, t, connect = (out.decode().split() + ["0", "0", "0"])[:3]
+        return {"code": int(code) or (int(connect) if int(connect) >= 400 else 0),
+                "ms": round(float(t) * 1000), "curl_exit": p.returncode or 0}
     except Exception:  # noqa: BLE001
         try:
             p and p.kill()
@@ -1564,7 +1565,127 @@ async def net_state() -> dict:
 
 # ─────────────── HTTP ───────────────
 
-PAGES = {"/": "git.html", "/agent": "agent.html", "/sessions": "sessions.html", "/settings": "settings.html"}
+def _connection_body(body: bytes) -> dict:
+    try:
+        data = json.loads(body)
+    except ValueError:
+        raise ValueError("Некорректный JSON") from None
+    if not isinstance(data, dict):
+        raise ValueError("Ожидается JSON-объект")
+    return data
+
+
+def _connection_proxy(data: dict, cfg: dict) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError("Ожидаются параметры прокси")
+    name = data.get("name", "")
+    if (not isinstance(name, str) or not name.strip() or len(name) > 80
+            or re.search(r"[\x00-\x1f\x7f]", name)):
+        raise ValueError("Введите название прокси (до 80 символов)")
+    name = name.strip()
+    if name == "direct" or any(p.get("name") == name for p in cfg.get("proxies") or []):
+        raise ValueError("Название прокси уже занято или зарезервировано")
+    url = data.get("url")
+    if url is None:
+        scheme, host = data.get("scheme", "http"), data.get("host", "")
+        port, user, password = str(data.get("port", "")), data.get("username", ""), data.get("password", "")
+        if not all(isinstance(v, str) for v in (scheme, host, user, password)):
+            raise ValueError("Некорректные параметры прокси")
+        host = host.strip()
+        if ":" in host and not host.startswith("["):
+            host = "[" + host + "]"
+        auth = urllib.parse.quote(user, safe="") + ":" + urllib.parse.quote(password, safe="") + "@" if user else ""
+        if password and not user:
+            raise ValueError("Для пароля укажите логин")
+        url = f"{scheme}://{auth}{host}:{port}"
+    if (not isinstance(url, str) or len(url) > 4096 or re.search(r'[\x00-\x20\x7f"\\]', url)):
+        raise ValueError("Некорректный URL прокси")
+    try:
+        u = urllib.parse.urlsplit(url)
+        valid = (u.scheme in ("http", "https", "socks5", "socks5h") and u.hostname
+                 and u.port and 1 <= u.port <= 65535 and u.path in ("", "/") and not u.query and not u.fragment)
+        # The authority must be a host/IPv6 literal, not curl configuration or a path.
+        valid = valid and bool(re.fullmatch(r"[\w.:-]+", u.hostname))
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("Ожидается http(s):// или socks5(h)://адрес:порт, порт от 1 до 65535")
+    return {"name": name, "url": url}
+
+
+def connections_save(body: bytes) -> dict:
+    try:
+        data = _connection_body(body)
+        cfg = load_config()
+        if "proxy" in data:
+            cfg["proxies"].append(_connection_proxy(data["proxy"], cfg))
+        defaults = data.get("defaults", {})
+        if not isinstance(defaults, dict):
+            raise ValueError("Ожидаются назначения агентов")
+        names = {"direct", *(p["name"] for p in cfg.get("proxies") or [])}
+        for tool, name in defaults.items():
+            if tool not in ("claude", "codex") or not isinstance(name, str) or name not in names:
+                raise ValueError("Выберите существующий прокси для Claude или Codex")
+            cfg["agents"][tool]["proxy"] = name
+        if "proxy" not in data and not defaults:
+            raise ValueError("Нет изменений для сохранения")
+        save_config(cfg)
+        CFG.clear()
+        CFG.update(cfg)
+        CACHE.pop("net:probe", None)
+        return {"ok": True}
+    except ValueError as ex:
+        return {"ok": False, "error": str(ex)}
+    except OSError:
+        return {"ok": False, "error": "Не удалось сохранить конфигурацию"}
+
+
+async def connections_check(body: bytes) -> dict:
+    try:
+        data = _connection_body(body)
+        if "proxy" in data:
+            px = _connection_proxy(data["proxy"], CFG)
+        else:
+            name = data.get("name")
+            px = {"name": "direct", "url": ""} if name == "direct" else next(
+                (p for p in CFG.get("proxies") or [] if p["name"] == name), None)
+            if not px:
+                raise ValueError("Неизвестный прокси")
+        result = await _probe_proxy(px["name"], px["url"])
+        at = time.time()
+        route = {"name": px["name"], "hp": result["hp"], "res": result["res"], "at": at}
+        # Include the URL only in private cache so edits never reuse an old route's result.
+        CACHE["connections:probe:" + px["name"]] = (time.monotonic(), {"url": px["url"], "route": route})
+        return {"ok": True, "route": route}
+    except ValueError as ex:
+        return {"ok": False, "error": str(ex)}
+
+
+async def connections_state() -> dict:
+    routes = []
+    for px in [*(CFG.get("proxies") or []), {"name": "direct", "url": ""}]:
+        hit = CACHE.get("connections:probe:" + px["name"])
+        route = {"name": px["name"], "hp": _hostport(px["url"]) if px["url"] else "",
+                 "res": {}, "at": None}
+        if hit and hit[1]["url"] == px["url"]:
+            route = hit[1]["route"]
+        else:
+            # Reuse existing network checks without launching extra probes on every poll.
+            probe = CACHE.get("net:probe")
+            known = next((p for p in probe[1].get("proxies", []) if p["name"] == px["name"]
+                          and p["hp"] == route["hp"]), None) if probe else None
+            if known:
+                route = {**route, "res": known["res"], "at": probe[1]["at"]}
+        routes.append(route)
+    return {"ok": True, "v": BOOT, "cwd": STATE.get("cwd") or "", "open_in": CFG.get("open_in", "window"),
+            "defaults": {t: CFG["agents"][t].get("proxy") or "" for t in ("claude", "codex")},
+            "routes": routes}
+
+
+PAGES = {"/": "git.html", "/agent": "agent.html", "/sessions": "sessions.html", "/settings": "settings.html",
+         "/connections": "connections.html"}
+FEATHER_ICONS = {f"/assets/feather/{name}.svg": name for name in
+                 ("settings", "globe", "chevron-down", "play", "star", "copy", "eye", "eye-off")}
 
 
 def page(name: str) -> bytes:
@@ -1587,6 +1708,11 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         ctype, status, restart = "application/json", b"200 OK", False
         if u.path in PAGES:
             out, ctype = page(PAGES[u.path]), "text/html; charset=utf-8"
+        elif u.path in FEATHER_ICONS:
+            with open(os.path.join(HERE, "resources", "feather", FEATHER_ICONS[u.path] + ".svg"), "rb") as asset:
+                out, ctype = asset.read(), "image/svg+xml"
+        elif u.path == "/connections/state":
+            out = json.dumps(await connections_state(), ensure_ascii=False).encode()
         elif u.path == "/state":
             out = json.dumps(await git_state(), ensure_ascii=False).encode()
         elif u.path == "/diff":
@@ -1606,8 +1732,13 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         elif u.path == "/settings/state":
             out = json.dumps(settings_state(), ensure_ascii=False).encode()
         elif u.path in ("/sessions/open", "/sessions/focus", "/settings/save", "/snaps/save", "/snaps/restore",
-                        "/net/copy", "/open-url") and not mutating:
+                        "/net/copy", "/open-url", "/connections/save", "/connections/check") and not mutating:
             out, ctype, status = "Доступ запрещён".encode(), "text/plain; charset=utf-8", b"403 Forbidden"
+        elif u.path in ("/connections/save", "/connections/check"):
+            result = connections_save(body) if u.path == "/connections/save" else await connections_check(body)
+            out = json.dumps(result, ensure_ascii=False).encode()
+            if not result["ok"]:
+                status = b"400 Bad Request"
         elif u.path == "/open-url":
             url = qs.get("url", "")
             try:
@@ -1695,7 +1826,7 @@ async def ensure_toolbelt(app, connection):
         pass
 
 
-TABS = [("git", "Git и PR", "/"), ("agent", "Действия агента", "/agent"),
+TABS = [("git", "Git и PR", "/"), ("agent", "Действия агента", "/agent"), ("connections", "Подключения", "/connections"),
         ("sessions", "Сессии", "/sessions"), ("settings", "Настройки", "/settings")]
 
 

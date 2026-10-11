@@ -23,6 +23,8 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}.mut{
 .add{padding-top:20px;border-top:1px solid var(--line)}.mode{display:flex;border:1px solid var(--line);border-radius:7px;padding:2px}.mode button{border:0;min-height:28px;font-size:12px;padding:4px 12px}.mode button[aria-pressed=true]{background:#2f81ef;color:white}.form-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 14px;margin-top:16px}.field{min-width:0;display:flex;flex-direction:column;gap:5px}.field.wide{grid-column:1/-1}.field label{font-size:13px}input[type=text],input[type=password],input[type=url],select{width:100%;min-width:0;min-height:36px;color:var(--fg);background:var(--surface);border:1px solid #3e4855;border-radius:7px;padding:7px 10px}input::placeholder{color:#8894a5}.password{position:relative}.password input{padding-right:40px}.password button{position:absolute;right:3px;top:1px;color:var(--mut);min-height:34px}.form-action{margin-top:18px}.form-result{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}.form-result h2{margin-bottom:10px}.form-result .small{margin-top:10px}.assignments{margin-top:16px}.foot{padding-top:18px;margin-top:22px;border-top:1px solid var(--line)}.foot .row{flex-wrap:wrap;gap:8px 16px}
 /* Keep the route-first hierarchy of the selected mockup in a narrow Toolbelt. */
 body{font-size:13px}.brand{font-size:13px}h1{font-size:23px}h2{font-size:16px}.segments{margin:12px 0 10px}.segments button{min-height:32px}.context{padding:11px 0}.default{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.default b{font-size:13px}.default .small{font-size:11px}.project .small{font-size:11px}.section-title{margin:16px 0 10px}.section-title .small{font-size:11px}.route{padding:10px 6px}.route.selected{padding:10px 12px}.route-name{font-size:15px}.route-body{margin-top:5px}.route-meta{margin-bottom:5px}.statuses{font-size:12px;gap:2px}.actions{margin:14px 0 16px}.actions .full{min-height:36px}.actions .small{font-size:11px}.add{padding-top:16px}.form-grid{margin-top:12px;gap:10px 14px}.field label{font-size:12px}.field{gap:4px}input[type=text],input[type=password],input[type=url],select{min-height:34px;padding:6px 10px}.form-action{margin-top:14px}.password button{min-height:32px}
+.launch-choice{display:flex;flex-wrap:wrap;gap:4px 10px;padding:10px 0}.launch-choice b{overflow-wrap:anywhere;min-width:0}.badge{font-size:10px;color:var(--blue);padding:2px 6px;border:1px solid #35475d;border-radius:5px;flex:none}.route-tools{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.route-tools button{font-size:11px;padding:4px 8px;min-height:30px}.danger{color:var(--bad)}.readiness{border-top:1px solid var(--line);padding-top:12px}.readiness dl{display:grid;grid-template-columns:70px minmax(0,1fr);gap:4px 10px;margin:10px 0;font-size:12px}.readiness dt{color:var(--mut)}.readiness dd{margin:0;overflow-wrap:anywhere}.readiness #launch-reason{font-size:11px}.readiness .row{flex-wrap:wrap}.context .default{display:block}.context .default b{margin-top:3px}
+dialog{color:var(--fg);background:var(--bg);border:1px solid #485365;border-radius:10px;padding:20px;width:min(460px,calc(100% - 32px));max-height:calc(100vh - 32px);overflow-y:auto}dialog::backdrop{background:#0009}dialog h2{font-size:18px;overflow-wrap:anywhere}#dialog-info{margin-top:8px;overflow-wrap:anywhere}.dialog-name{margin-top:16px}.dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:20px}.dialog-actions button{min-width:0;overflow-wrap:anywhere}.primary.danger{background:#a93737;border-color:#a93737;color:white}.primary.danger:hover:not(:disabled){background:#bb4545;border-color:#bb4545}
 [hidden]{display:none!important}@media(max-width:360px){main{padding:16px}h1{font-size:23px}.section-title .small{max-width:48%;font-size:11px}.context{gap:8px}.project{padding-left:10px}.route-body{margin-left:27px}.full{font-size:13px}.status{font-size:12px}.mode button{padding:4px 9px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
@@ -31,10 +33,12 @@ body{font-size:13px}.brand{font-size:13px}h1{font-size:23px}h2{font-size:16px}.s
 <main>
   <header class="row space header"><div><div class="brand">Agentbelt</div><h1>Подключения</h1></div><a class="settings" href="/settings#network" aria-label="Настройки сети"><span class="icon" style="--icon:url('/assets/feather/settings.svg')" aria-hidden="true"></span></a></header>
   <div class="segments" id="agents" aria-label="Выбор агента"><button type="button" data-tool="claude" aria-pressed="true">Claude Code</button><button type="button" data-tool="codex" aria-pressed="false">Codex</button></div>
-  <div class="row context"><div class="default"><span class="small">Новые сессии</span><b id="default-name">Загрузка…</b></div><div class="project"><div class="small mut">Проект</div><div class="project-name" id="project">—</div></div></div>
+  <div class="row context"><div class="default"><span class="small" id="default-caption">По умолчанию для Claude</span><b id="default-name">Загрузка…</b></div><div class="project"><div class="small mut">Проект</div><div class="project-name" id="project">—</div></div></div>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
   <div class="row space section-title"><h2>Маршруты</h2><span class="small mut">Доступность для каждого агента отдельно</span></div>
   <div id="routes" class="routes" aria-label="Маршрут запуска"><p class="mut">Загрузка маршрутов…</p></div>
+  <div class="launch-choice"><span class="small mut">Для разового запуска</span><b id="selected-name">Выберите маршрут</b></div>
+  <section class="readiness" aria-labelledby="readiness-title"><div class="row space"><h2 id="readiness-title">Готовность запуска</h2><button id="refresh-readiness" type="button" class="probe-btn" aria-label="Проверить готовность запуска">Обновить</button></div><dl id="readiness-status"></dl><p class="small mut" id="launch-reason">Проверка готовности…</p></section>
   <div class="actions"><button class="primary full" id="launch" disabled><span class="icon" style="--icon:url('/assets/feather/play.svg')" aria-hidden="true"></span><span id="launch-label">Запустить Claude</span></button><button class="full" id="set-default" disabled><span class="icon" style="--icon:url('/assets/feather/star.svg')" aria-hidden="true"></span><span id="default-label">Использовать по умолчанию</span></button><p class="small mut" title="Работающие сессии сохранят свой маршрут">Для новых запусков</p></div>
   <section class="add" aria-labelledby="add-title">
     <div class="row space"><h2 id="add-title">Добавить прокси</h2><div class="mode" aria-label="Способ добавления"><button type="button" data-mode="url" aria-pressed="false">URL</button><button type="button" data-mode="fields" aria-pressed="true">Поля</button></div></div>
@@ -55,41 +59,301 @@ body{font-size:13px}.brand{font-size:13px}h1{font-size:23px}h2{font-size:16px}.s
     <div class="assignments" id="assignments" hidden><h2>После добавления</h2><p class="small mut">Для новых запусков</p><div class="form-grid"><div class="field"><label for="assign-claude">Claude Code</label><select id="assign-claude"></select></div><div class="field"><label for="assign-codex">Codex</label><select id="assign-codex"></select></div></div><button id="save-assignments" type="button" class="full form-action">Сохранить назначения</button></div>
   </section>
   <footer class="foot small"><div class="row"><a href="/sessions">К сессиям</a><a href="/settings#network">Серверы и роутер</a></div><p class="mut" style="margin-top:8px">Работающие сессии сохранят свой маршрут. Проверка API не подтверждает работу аккаунта.</p></footer>
+  <dialog id="route-dialog" aria-labelledby="dialog-title">
+    <form id="manage-form"><h2 id="dialog-title"></h2><p class="small mut" id="dialog-info"></p>
+      <div class="field dialog-name" id="dialog-name-field"><label for="edit-name">Название прокси</label><input id="edit-name" type="text" maxlength="80" required autocomplete="off"></div>
+      <div class="form-grid" id="edit-fields">
+        <div class="field"><label for="edit-scheme">Протокол</label><select id="edit-scheme"><option value="http">HTTP</option><option value="https">HTTPS</option><option value="socks5">SOCKS5</option><option value="socks5h">SOCKS5h</option></select></div>
+        <div class="field"><label for="edit-port">Порт</label><input id="edit-port" type="text" inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" required></div>
+        <div class="field wide"><label for="edit-host">Адрес</label><input id="edit-host" type="text" required autocomplete="off" spellcheck="false"></div>
+        <div class="field wide"><label for="edit-user">Логин</label><input id="edit-user" type="text" autocomplete="off" spellcheck="false"></div>
+        <div class="field wide"><label for="edit-password-action">Действие с паролем</label><select id="edit-password-action"><option value="keep">Сохранить текущий пароль</option><option value="replace">Заменить пароль</option><option value="remove">Удалить пароль</option></select><span class="small mut" id="password-hint"></span></div>
+        <div class="field wide" id="edit-password-field" hidden><label for="edit-password">Новый пароль</label><div class="password"><input id="edit-password" type="password" autocomplete="new-password" disabled><button type="button" id="edit-show-password" class="icon-button" aria-label="Показать новый пароль"><span class="icon" style="--icon:url('/assets/feather/eye.svg')" aria-hidden="true"></span></button></div></div>
+      </div>
+      <div id="delete-replacements" class="form-grid" hidden></div>
+      <div id="dialog-error" class="message error" role="alert" hidden></div>
+      <div class="dialog-actions"><button id="cancel-management" type="button">Отмена</button><button id="confirm-management" type="submit" class="primary">Сохранить изменения</button></div>
+    </form>
+  </dialog>
 </main>
 <script>
-const $=id=>document.getElementById(id),e=s=>String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icon=n=>`<span class="icon" style="--icon:url('/assets/feather/${n}.svg')" aria-hidden="true"></span>`;
-const label=n=>n==='direct'?'напрямую':n;
-let state=null,tool='claude',selected=null,mode='fields',busy=false,adding=false,lastRoutes='',addedName='';
-try{tool=localStorage.getItem('connection-tool')==='codex'?'codex':'claude'}catch(_){}
-function notify(text,error=false){const m=$('message');m.textContent=text;m.className='message '+(error?'error':'success');m.hidden=false}
-function formError(text){$('form-error').textContent=text;$('form-error').hidden=!text}
-function status(r){if(!r)return{cls:'mut',text:'Не проверено'};if(!r.code){const reasons={5:'Не удалось найти прокси',6:'Не удалось найти API',7:'Не удалось подключиться',28:'Время ожидания истекло',35:'Ошибка TLS',60:'Ошибка сертификата'};return{cls:'bad',text:reasons[r.curl_exit]||'Не удалось подключиться'}}
- if(r.code===401)return{cls:'ok',text:'API доступен (401)'};if(r.code===407)return{cls:'warn',text:'Прокси требует авторизацию'};if(r.code===403)return{cls:'bad',text:'Отказ 403'};if(r.code===429)return{cls:'warn',text:'Лимит запросов (429)'};if(r.code>=200&&r.code<400)return{cls:'ok',text:'API доступен'};return{cls:'warn',text:'Ответ API: '+r.code}}
-function statusRows(res){return['claude','codex'].map(t=>{const r=res?.[t],s=status(r);return`<div class="status"><span class="label">${t==='claude'?'Claude':'Codex'}:</span><span class="${s.cls}">${e(s.text)}${r?.ms!=null?' · '+e(r.ms)+' мс':''}</span></div>`}).join('')}
-function updateControls(){if(!state)return;const valid=state.routes.some(r=>r.name===selected);$('agents').classList.toggle('codex',tool==='codex');document.querySelectorAll('[data-tool]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.tool===tool));b.disabled=busy||adding});$('routes').querySelectorAll('input,button').forEach(b=>b.disabled=busy||adding);
- const d=state.defaults[tool];$('default-name').textContent=d?label(d):'Из параметров запуска';$('project').textContent=state.cwd?state.cwd.split('/').filter(Boolean).pop()||'/':'Каталог не определён';$('project').title=state.cwd;
- $('launch-label').textContent='Запустить '+(tool==='claude'?'Claude':'Codex')+(selected==='direct'?' напрямую':selected?' через '+selected:'');$('launch').disabled=busy||adding||!valid||!state.cwd;
- $('set-default').disabled=busy||adding||!valid;$('default-label').textContent=d===selected?'Маршрут по умолчанию':'Использовать по умолчанию';
+const $ = id => document.getElementById(id);
+const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icon = n => `<span class="icon" style="--icon:url('/assets/feather/${n}.svg')" aria-hidden="true"></span>`;
+const label = n => n === 'direct' ? 'напрямую' : n;
+const agentLabel = t => ({claude:'Claude Code',codex:'Codex',pi:'pi',omp:'omp'}[t] || t);
+let state = null, tool = 'claude', selected = null, mode = 'fields';
+let busy = false, adding = false, offline = false, readyChecking = false, modalSaving = false;
+let lastRoutes = '', management = null, managementOpener = null;
+const choices = new Map();
+try { tool = localStorage.getItem('connection-tool') === 'codex' ? 'codex' : 'claude'; } catch (_) {}
+
+function notify(text, error = false) {
+  const m = $('message'); m.textContent = text; m.className = 'message ' + (error ? 'error' : 'success'); m.hidden = false;
 }
-function renderRoutes(){if(!state)return;const h=state.routes.map(r=>{const is=selected===r.name;return`<div class="route ${is?'selected':''}"><div class="row route-top"><label><input type="radio" name="route" value="${e(r.name)}" ${is?'checked':''}>${icon('globe')}<span class="route-name">${e(r.name==='direct'?'Напрямую':r.name)}</span>${icon('chevron-down')}</label></div><div class="route-body">${is?`<div class="route-meta">${r.hp?`<span class="endpoint">${e(r.hp)}</span>`:'<span class="endpoint">Без прокси в окружении запуска</span>'}${is?`<button type="button" class="icon-button" data-copy="${e(r.name)}" aria-label="Скопировать настройку ${e(label(r.name))}">${icon('copy')}</button><button type="button" class="probe-btn" data-check="${e(r.name)}">Проверить</button>`:''}</div>`:''}<div class="statuses">${statusRows(r.res)}</div>${is&&r.at?`<div class="checked">Проверено в ${e(new Date(r.at*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}))}</div>`:''}</div></div>`}).join('');if(h===lastRoutes)return;
- const active=document.activeElement,focus=active?.dataset.check?['check',active.dataset.check]:active?.dataset.copy?['copy',active.dataset.copy]:active?.name==='route'?['route',active.value]:null;
- $('routes').innerHTML=h;lastRoutes=h;if(focus){const node=focus[0]==='route'?[...$('routes').querySelectorAll('input')].find(n=>n.value===focus[1]):[...$('routes').querySelectorAll('[data-'+focus[0]+']')].find(n=>n.dataset[focus[0]]===focus[1]);node?.focus()}}
-async function refresh(){try{const r=await fetch('/connections/state'),d=await r.json();if(!r.ok||!d.ok)throw Error('Не удалось загрузить маршруты');state=d;if(!d.routes.some(r=>r.name===selected))selected=d.defaults[tool]&&d.routes.some(r=>r.name===d.defaults[tool])?d.defaults[tool]:d.routes[0]?.name||'direct';renderRoutes();updateControls();return true}catch(err){notify('Панель не отвечает. '+err.message,true);return false}}
-async function api(path,data){const r=await fetch(path,{method:'POST',headers:{'X-Toolbelt':'1','Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'Не удалось выполнить действие');return d}
-document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{if(busy)return;tool=b.dataset.tool;try{localStorage.setItem('connection-tool',tool)}catch(_){};selected=state?.defaults[tool]&&state.routes.some(r=>r.name===state.defaults[tool])?state.defaults[tool]:state?.routes[0]?.name||'direct';renderRoutes();updateControls()});
-$('routes').onchange=ev=>{if(ev.target.name==='route'){selected=ev.target.value;renderRoutes();updateControls()}};
-$('routes').onclick=async ev=>{const b=ev.target.closest('button');if(!b||busy)return;busy=true;updateControls();b.disabled=true;const old=b.textContent;try{if(b.dataset.check){b.textContent='Проверка…';const d=await api('/connections/check',{name:b.dataset.check});notify('Проверка завершена. Результаты показаны отдельно для Claude и Codex.');await refresh()}else if(b.dataset.copy){const r=await fetch('/net/copy?'+new URLSearchParams({name:b.dataset.copy}),{method:'POST',headers:{'X-Toolbelt':'1'}});const t=await r.text();if(!r.ok||t!=='copied')throw Error(t);notify('Команда скопирована. Она содержит учётные данные прокси.')}}catch(err){notify(err.message,true)}finally{busy=false;b.disabled=false;if(b.dataset.check)b.textContent=old;updateControls()}};
-$('set-default').onclick=async()=>{busy=true;updateControls();try{await api('/connections/save',{defaults:{[tool]:selected}});await refresh();notify('Для новых сессий '+(tool==='claude'?'Claude':'Codex')+': '+label(selected))}catch(err){notify(err.message,true)}finally{busy=false;updateControls()}};
-$('launch').onclick=async()=>{if(!state?.cwd||!selected)return;busy=true;updateControls();$('launch-label').textContent='Отправка команды…';try{const r=await fetch('/sessions/open?'+new URLSearchParams({tool,proxy:selected,dir:state.cwd,where:state.open_in}),{method:'POST',headers:{'X-Toolbelt':'1'}});const text=await r.text();if(!r.ok||text!=='ok')throw Error(text);notify('Команда запуска отправлена в iTerm2. Вход в аккаунт выполняется в терминале.')}catch(err){notify(err.message,true)}finally{busy=false;updateControls()}};
-function setMode(m){mode=m;document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===m)));document.querySelectorAll('[data-fields]').forEach(n=>{n.hidden=m==='url';n.querySelectorAll('input,select').forEach(i=>i.disabled=m==='url')});$('url-field').hidden=m!=='url';$('proxy-url').disabled=m!=='url';$('proxy-url').required=m==='url';formError('')}
-document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{if(!adding)setMode(b.dataset.mode)});
-$('show-password').onclick=()=>{const input=$('proxy-password'),show=input.type==='password';input.type=show?'text':'password';$('show-password').setAttribute('aria-label',show?'Скрыть пароль':'Показать пароль');$('show-password').innerHTML=icon(show?'eye-off':'eye')};
-function formData(){const proxy={name:$('proxy-name').value.trim()};if(mode==='url')proxy.url=$('proxy-url').value.trim();else Object.assign(proxy,{scheme:$('proxy-scheme').value,host:$('proxy-host').value.trim(),port:$('proxy-port').value.trim(),username:$('proxy-user').value,password:$('proxy-password').value});return{proxy}}
-function assignments(){const opts='<option value="">Не менять</option>'+state.routes.map(r=>`<option value="${e(r.name)}">${e(label(r.name))}</option>`).join('');$('assign-claude').innerHTML=opts;$('assign-codex').innerHTML=opts;$('assignments').hidden=false}
-$('proxy-form').onsubmit=async ev=>{ev.preventDefault();if(adding||busy)return;adding=true;const payload=formData();const controls=[...$('proxy-form').querySelectorAll('input,select,button')].map(n=>[n,n.disabled]);controls.forEach(([n])=>n.disabled=true);updateControls();$('add-proxy').disabled=true;$('add-proxy').textContent='Проверка…';formError('');$('form-result').hidden=true;document.querySelectorAll('[data-mode]').forEach(b=>b.disabled=true);try{const d=await api('/connections/check',payload);$('form-statuses').innerHTML=statusRows(d.route.res);$('form-result').hidden=false;$('add-proxy').textContent='Сохранение…';await api('/connections/save',payload);addedName=d.route.name;selected=addedName;await refresh();assignments();$('proxy-password').value='';$('proxy-password').type='password';$('show-password').setAttribute('aria-label','Показать пароль');$('show-password').innerHTML=icon('eye');$('proxy-url').value='';$('proxy-name').value='';notify('Прокси «'+addedName+'» добавлен. Назначьте его агентам или запустите разово.')}catch(err){formError(err.message)}finally{adding=false;controls.forEach(([n,was])=>n.disabled=was);updateControls();$('add-proxy').disabled=false;$('add-proxy').textContent='Проверить и добавить';document.querySelectorAll('[data-mode]').forEach(b=>b.disabled=false)}};
-$('save-assignments').onclick=async()=>{const defaults={};for(const t of ['claude','codex']){const value=$('assign-'+t).value;if(value)defaults[t]=value}if(!Object.keys(defaults).length){notify('Выберите маршрут хотя бы для одного агента',true);return}busy=true;updateControls();$('save-assignments').disabled=true;try{await api('/connections/save',{defaults});await refresh();notify('Назначения сохранены для новых сессий')}catch(err){notify(err.message,true)}finally{busy=false;$('save-assignments').disabled=false;updateControls()}};
-setMode(mode);refresh();setInterval(()=>{if(!busy&&!adding)refresh()},5000);
+function formError(text) { $('form-error').textContent = text; $('form-error').hidden = !text; }
+function status(r) {
+  if (!r) return {cls:'mut',text:'Не проверено'};
+  if (!r.code) {
+    const reasons = {5:'Не удалось найти прокси',6:'Не удалось найти API',7:'Не удалось подключиться',28:'Время ожидания истекло',35:'Ошибка TLS',60:'Ошибка сертификата'};
+    return {cls:'bad',text:reasons[r.curl_exit] || 'Не удалось подключиться'};
+  }
+  if (r.code === 401) return {cls:'ok',text:'API доступен (401)'};
+  if (r.code === 407) return {cls:'warn',text:'Прокси требует авторизацию'};
+  if (r.code === 403) return {cls:'bad',text:'Отказ 403'};
+  if (r.code === 429) return {cls:'warn',text:'Лимит запросов (429)'};
+  return r.code >= 200 && r.code < 400 ? {cls:'ok',text:'API доступен'} : {cls:'warn',text:'Ответ API: ' + r.code};
+}
+function statusRows(res) {
+  return ['claude','codex'].map(t => {
+    const r = res?.[t], s = status(r);
+    return `<div class="status"><span class="label">${t === 'claude' ? 'Claude' : 'Codex'}:</span><span class="${s.cls}">${e(s.text)}${r?.ms != null ? ' · ' + e(r.ms) + ' мс' : ''}</span></div>`;
+  }).join('');
+}
+function routeExists(name) { return !!state?.routes.some(r => r.name === name); }
+function initialChoice(t) {
+  const chosen = choices.has(t) ? choices.get(t) : state?.defaults[t];
+  return routeExists(chosen) ? chosen : null;
+}
+function selectRoute(name) { selected = name; choices.set(tool,name); renderRoutes(); updateControls(); }
+function updateControls() {
+  if (!state) return;
+  const locked = busy || adding || modalSaving, valid = routeExists(selected);
+  $('agents').classList.toggle('codex',tool === 'codex');
+  document.querySelectorAll('[data-tool]').forEach(b => { b.setAttribute('aria-pressed',String(b.dataset.tool === tool)); b.disabled = locked; });
+  $('routes').querySelectorAll('input,button').forEach(b => b.disabled = locked);
+  const d = state.defaults[tool];
+  $('default-caption').textContent = 'По умолчанию для ' + (tool === 'claude' ? 'Claude' : 'Codex');
+  $('default-name').textContent = !d ? 'Из параметров агента' : routeExists(d) ? label(d) : 'Маршрут не найден: ' + d;
+  $('default-name').classList.toggle('bad',!!d && !routeExists(d));
+  $('selected-name').textContent = selected ? label(selected) : 'Выберите маршрут';
+  $('project').textContent = state.cwd ? state.cwd.split('/').filter(Boolean).pop() || '/' : 'Каталог не определён';
+  $('project').title = state.cwd;
+  const r = state.readiness || {}, cli = r.cli?.[tool];
+  $('readiness-status').innerHTML = `<dt>iTerm2</dt><dd class="${r.iterm ? 'ok' : 'bad'}">${r.iterm ? 'Подключён' : 'Нет соединения'}</dd><dt>${tool === 'claude' ? 'Claude' : 'Codex'} CLI</dt><dd class="${cli === true ? 'ok' : cli === false ? 'bad' : 'mut'}">${readyChecking ? 'Проверка…' : cli === true ? 'Найден в новой оболочке' : cli === false ? 'Не найден в новой оболочке' : r.cli?.error ? e(r.cli.error) : 'Не проверен'}</dd><dt>Каталог</dt><dd class="${r.directory ? '' : 'bad'}">${e(state.cwd || 'Не определён')}${state.cwd && !r.directory ? ' · не существует' : ''}</dd>`;
+  const reason = offline ? 'Панель не отвечает' : !valid ? 'Выберите маршрут для разового запуска' : !r.iterm ? 'Подключите iTerm2 и включите Python API' : !r.directory ? 'Откройте каталог проекта в активной области iTerm2' : readyChecking ? 'Проверяем доступность CLI' : cli !== true ? (r.cli?.error || (cli === false ? 'Установите CLI или исправьте PATH новой оболочки' : 'Проверьте готовность запуска')) : 'Готов к отправке команды. Вход в аккаунт выполняется в терминале.';
+  $('launch-reason').textContent = reason;
+  $('refresh-readiness').disabled = locked || readyChecking;
+  $('refresh-readiness').textContent = readyChecking ? 'Проверка…' : 'Обновить';
+  $('launch-label').textContent = 'Запустить ' + (tool === 'claude' ? 'Claude' : 'Codex') + (selected === 'direct' ? ' напрямую' : selected ? ' через ' + selected : '');
+  $('launch').disabled = locked || offline || readyChecking || !valid || !r.iterm || !r.directory || cli !== true;
+  $('set-default').disabled = locked || offline || !valid || d === selected;
+  $('default-label').textContent = valid && d === selected ? 'Уже по умолчанию для ' + (tool === 'claude' ? 'Claude' : 'Codex') : 'Использовать по умолчанию';
+  $('assignments').querySelectorAll('select,button').forEach(b => b.disabled = locked);
+}
+function renderRoutes() {
+  if (!state) return;
+  const h = state.routes.map(r => {
+    const is = selected === r.name, def = state.defaults[tool] === r.name;
+    return `<div class="route ${is ? 'selected' : ''}"><div class="row route-top"><label><input type="radio" name="route" aria-label="${e(r.name === 'direct' ? 'Напрямую' : r.name)}" value="${e(r.name)}" ${is ? 'checked' : ''}>${icon('globe')}<span class="route-name">${e(r.name === 'direct' ? 'Напрямую' : r.name)}</span>${icon('chevron-down')}</label></div>${def ? '<span class="badge">По умолчанию</span>' : ''}<div class="route-body">${is ? `<div class="route-meta"><span class="endpoint">${e(r.hp || 'Без прокси в окружении запуска')}</span><button type="button" class="icon-button" data-copy="${e(r.name)}" aria-label="Скопировать настройку ${e(label(r.name))}">${icon('copy')}</button><button type="button" class="probe-btn" data-check="${e(r.name)}">Проверить</button></div>` : ''}<div class="statuses">${statusRows(r.res)}</div>${is && r.at ? `<div class="checked">Проверено в ${e(new Date(r.at*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}))}</div>` : ''}${is && r.name !== 'direct' ? `<div class="route-tools"><button type="button" data-manage="edit" data-name="${e(r.name)}">Изменить</button><button type="button" data-manage="duplicate" data-name="${e(r.name)}">Дублировать</button><button type="button" class="danger" data-manage="delete" data-name="${e(r.name)}">Удалить</button></div>` : ''}</div></div>`;
+  }).join('');
+  if (h === lastRoutes) return;
+  const a = document.activeElement;
+  const focus = a?.name === 'route' ? ['route',a.value] : ['check','copy','manage'].map(k => a?.dataset[k] ? [k,a.dataset[k]] : null).find(Boolean);
+  $('routes').innerHTML = h; lastRoutes = h;
+  if (focus) {
+    const node = [...$('routes').querySelectorAll('input,button')].find(n => focus[0] === 'route' ? n.value === focus[1] : n.dataset[focus[0]] === focus[1]);
+    node?.focus();
+  }
+}
+function errorText(err) {
+  return err instanceof TypeError || err instanceof SyntaxError ? 'Не удалось получить ответ панели. Повторите действие.' : err.message || 'Не удалось выполнить действие';
+}
+async function api(path,data) {
+  const r = await fetch(path,{method:'POST',headers:{'X-Toolbelt':'1','Content-Type':'application/json'},body:JSON.stringify(data)});
+  const d = await r.json();
+  if (!r.ok || !d.ok) throw Error(d.error || 'Не удалось выполнить действие');
+  return d;
+}
+async function refresh() {
+  try {
+    const r = await fetch('/connections/state'), d = await r.json();
+    if (!r.ok || !d.ok) throw Error('Не удалось загрузить маршруты');
+    const first = !state;
+    state = d;
+    if (first) selected = initialChoice(tool);
+    else if (selected && !routeExists(selected)) { selected = null; choices.set(tool,null); notify('Выбранный маршрут больше не существует. Выберите другой.',true); }
+    if (offline) notify('Соединение с панелью восстановлено');
+    offline = false;
+    renderRoutes(); updateAssignments(); updateControls(); return true;
+  } catch (err) {
+    offline = true; notify('Панель не отвечает. ' + errorText(err),true); updateControls(); return false;
+  }
+}
+async function checkReadiness() {
+  if (readyChecking) return;
+  readyChecking = true; updateControls();
+  try { await api('/connections/readiness',{}); await refresh(); }
+  catch (err) {
+    if (err instanceof TypeError || err instanceof SyntaxError) offline = true;
+    notify(errorText(err),true);
+  }
+  finally { readyChecking = false; updateControls(); }
+}
+$('refresh-readiness').onclick = checkReadiness;
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => {
+  if (busy || adding) return;
+  choices.set(tool,selected); tool = b.dataset.tool;
+  try { localStorage.setItem('connection-tool',tool); } catch (_) {}
+  selected = initialChoice(tool); renderRoutes(); updateControls();
+});
+$('routes').onchange = ev => { if (ev.target.name === 'route') selectRoute(ev.target.value); };
+$('routes').onclick = async ev => {
+  const b = ev.target.closest('button'); if (!b || busy || adding) return;
+  if (b.dataset.manage) { await openManagement(b.dataset.manage,b.dataset.name,b); return; }
+  busy = true; updateControls();
+  try {
+    if (b.dataset.check) {
+      b.textContent = 'Проверка…'; await api('/connections/check',{name:b.dataset.check});
+      notify('Проверка завершена. Результаты показаны отдельно для Claude и Codex.'); await refresh();
+    } else if (b.dataset.copy) {
+      const r = await fetch('/net/copy?' + new URLSearchParams({name:b.dataset.copy}),{method:'POST',headers:{'X-Toolbelt':'1'}});
+      const t = await r.text(); if (!r.ok || t !== 'copied') throw Error(t);
+      notify(b.dataset.copy === 'direct' ? 'Команда прямого подключения скопирована' : 'Команда скопирована. Она содержит учётные данные прокси.');
+    }
+  } catch (err) { notify(errorText(err),true); }
+  finally { busy = false; if (b.dataset.check) b.textContent = 'Проверить'; updateControls(); }
+};
+$('set-default').onclick = async () => {
+  busy = true; updateControls();
+  try { await api('/connections/save',{defaults:{[tool]:selected}}); await refresh(); notify('По умолчанию для новых сессий ' + agentLabel(tool) + ': ' + label(selected)); }
+  catch (err) { notify(errorText(err),true); }
+  finally { busy = false; updateControls(); }
+};
+$('launch').onclick = async () => {
+  if (!state?.cwd || !selected || $('launch').disabled) return;
+  const payload = {tool,proxy:selected,dir:state.cwd};
+  busy = true; updateControls(); $('launch-label').textContent = 'Проверка и отправка команды…';
+  try { await api('/connections/launch',payload); notify('Команда запуска отправлена в iTerm2. Вход в аккаунт выполняется в терминале.'); }
+  catch (err) { notify(errorText(err),true); await refresh(); }
+  finally { busy = false; updateControls(); }
+};
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed',String(b.dataset.mode === m)));
+  document.querySelectorAll('[data-fields]').forEach(n => { n.hidden = m === 'url'; n.querySelectorAll('input,select').forEach(i => i.disabled = m === 'url'); });
+  $('url-field').hidden = m !== 'url'; $('proxy-url').disabled = m !== 'url'; $('proxy-url').required = m === 'url'; formError('');
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { if (!adding) setMode(b.dataset.mode); });
+function togglePassword(input,button,word = 'пароль') {
+  const show = input.type === 'password'; input.type = show ? 'text' : 'password';
+  button.setAttribute('aria-label',(show ? 'Скрыть ' : 'Показать ') + word); button.innerHTML = icon(show ? 'eye-off' : 'eye');
+}
+$('show-password').onclick = () => togglePassword($('proxy-password'),$('show-password'));
+function formData() {
+  const proxy = {name:$('proxy-name').value.trim()};
+  if (mode === 'url') proxy.url = $('proxy-url').value.trim();
+  else Object.assign(proxy,{scheme:$('proxy-scheme').value,host:$('proxy-host').value.trim(),port:$('proxy-port').value.trim(),username:$('proxy-user').value,password:$('proxy-password').value});
+  return {proxy};
+}
+function updateAssignments() {
+  if (!state || $('assignments').hidden) return;
+  const opts = '<option value="">Не менять</option>' + state.routes.map(r => `<option value="${e(r.name)}">${e(label(r.name))}</option>`).join('');
+  for (const t of ['claude','codex']) {
+    const n = $('assign-' + t), value = n.value;
+    if (n.innerHTML !== opts) { n.innerHTML = opts; n.value = routeExists(value) ? value : ''; }
+  }
+}
+$('proxy-form').onsubmit = async ev => {
+  ev.preventDefault(); if (adding || busy) return;
+  adding = true;
+  const payload = formData(), controls = [...$('proxy-form').querySelectorAll('input,select,button')].map(n => [n,n.disabled]);
+  controls.forEach(([n]) => n.disabled = true); updateControls(); $('add-proxy').textContent = 'Проверка…'; formError(''); $('form-result').hidden = true;
+  document.querySelectorAll('[data-mode]').forEach(b => b.disabled = true);
+  try {
+    const d = await api('/connections/check',payload); $('form-statuses').innerHTML = statusRows(d.route.res); $('form-result').hidden = false;
+    $('add-proxy').textContent = 'Сохранение…'; await api('/connections/save',payload); selected = d.route.name; choices.set(tool,selected);
+    await refresh(); $('assignments').hidden = false; updateAssignments();
+    $('proxy-password').value = ''; $('proxy-password').type = 'password'; $('show-password').setAttribute('aria-label','Показать пароль'); $('show-password').innerHTML = icon('eye');
+    $('proxy-url').value = ''; $('proxy-name').value = ''; notify('Прокси «' + d.route.name + '» добавлен. Назначьте его агентам или запустите разово.');
+  } catch (err) { formError(errorText(err)); }
+  finally {
+    adding = false; controls.forEach(([n,was]) => n.disabled = was); updateControls(); $('add-proxy').textContent = 'Проверить и добавить'; document.querySelectorAll('[data-mode]').forEach(b => b.disabled = false);
+  }
+};
+$('save-assignments').onclick = async () => {
+  const defaults = {};
+  for (const t of ['claude','codex']) { const value = $('assign-' + t).value; if (value) defaults[t] = value; }
+  if (!Object.keys(defaults).length) { notify('Выберите маршрут хотя бы для одного агента',true); return; }
+  busy = true; updateControls();
+  try { await api('/connections/save',{defaults}); await refresh(); notify('Назначения сохранены для новых сессий'); }
+  catch (err) { notify(errorText(err),true); }
+  finally { busy = false; updateControls(); }
+};
+function dialogError(text) { $('dialog-error').textContent = text; $('dialog-error').hidden = !text; }
+function passwordAction() {
+  const action = $('edit-password-action').value, replace = action === 'replace';
+  $('edit-password-field').hidden = !replace; $('edit-password').disabled = !replace; $('edit-password').required = replace;
+  $('password-hint').textContent = replace ? 'Введите новый пароль. Он заменит текущий после сохранения.' : action === 'remove' ? 'Пароль будет удалён после сохранения.' : management?.passwordSet ? 'Пароль задан и сохранится без повторного ввода' : 'Пароль не задан';
+  $('edit-password').value = ''; $('edit-password').type = 'password'; $('edit-show-password').innerHTML = icon('eye'); $('edit-show-password').setAttribute('aria-label','Показать новый пароль');
+}
+$('edit-password-action').onchange = passwordAction;
+$('edit-show-password').onclick = () => togglePassword($('edit-password'),$('edit-show-password'),'новый пароль');
+async function openManagement(action,name,opener) {
+  busy = true; updateControls();
+  try {
+    const r = await fetch('/connections/details?' + new URLSearchParams({name})), d = await r.json();
+    if (!r.ok || !d.ok) throw Error(d.error || 'Не удалось открыть прокси');
+    management = {action,name,revision:d.revision,passwordSet:d.proxy.password_set}; managementOpener = opener;
+    const p = d.proxy, edit = action === 'edit', duplicate = action === 'duplicate', del = action === 'delete';
+    $('manage-form').reset(); dialogError('');
+    $('dialog-title').textContent = edit ? 'Изменить прокси' : duplicate ? 'Дублировать прокси' : 'Удалить «' + name + '»?';
+    $('dialog-info').textContent = del ? (d.used_by.length ? 'Выберите замену для назначений ниже. Работающие сессии сохранят прежний маршрут.' : 'Прокси не назначен агентам по умолчанию. Работающие сессии сохранят прежний маршрут.') : edit ? 'Назначения обновятся при переименовании. Текущий пароль не передаётся в форму.' : 'Адрес и учётные данные будут скопированы локально. Назначения агентов сохранятся.';
+    $('dialog-name-field').hidden = del; $('edit-name').disabled = del; $('edit-name').required = !del;
+    let newName = (name.slice(0,69) + ' — копия');
+    for (let n = 2; routeExists(newName); n++) newName = name.slice(0,65) + ' — копия ' + n;
+    $('edit-name').value = duplicate ? newName : name;
+    $('edit-fields').hidden = !edit;
+    $('edit-fields').querySelectorAll('input,select,button').forEach(n => n.disabled = !edit);
+    for (const key of ['scheme','port','host']) $('edit-' + key).value = p[key];
+    $('edit-user').value = p.username; $('edit-password-action').value = 'keep';
+    passwordAction();
+    $('delete-replacements').hidden = !del;
+    $('delete-replacements').innerHTML = del ? d.used_by.map(t => `<div class="field wide"><label for="replacement-${e(t)}">Замена для ${e(agentLabel(t))}</label><select id="replacement-${e(t)}" data-replacement="${e(t)}" required><option value="" disabled selected>Выберите маршрут</option>${state.routes.filter(route => route.name !== name).map(route => `<option value="${e(route.name)}">${e(label(route.name))}</option>`).join('')}</select></div>`).join('') : '';
+    $('confirm-management').textContent = del ? 'Удалить прокси' : duplicate ? 'Создать копию' : 'Сохранить изменения';
+    $('confirm-management').classList.toggle('danger',del);
+    $('route-dialog').showModal(); (del ? $('delete-replacements').querySelector('select') || $('cancel-management') : $('edit-name')).focus();
+  } catch (err) { notify(errorText(err),true); }
+  finally { busy = false; updateControls(); }
+}
+$('cancel-management').onclick = () => { if (!modalSaving) $('route-dialog').close(); };
+$('route-dialog').oncancel = ev => { if (modalSaving) ev.preventDefault(); };
+$('route-dialog').onkeydown = ev => {
+  if (ev.key !== 'Tab') return;
+  const fields = [...$('route-dialog').querySelectorAll('input,select,button')].filter(n => !n.disabled && n.getClientRects().length);
+  const first = fields[0], last = fields[fields.length - 1];
+  if (!first) { ev.preventDefault(); return; }
+  if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+  else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+};
+$('route-dialog').onclose = () => {
+  $('manage-form').reset(); $('edit-password').value = ''; management = null;
+  if (managementOpener?.isConnected) managementOpener.focus();
+  else ($('routes').querySelector('input:checked') || $('routes').querySelector('input') || $('proxy-name')).focus();
+};
+$('manage-form').onsubmit = async ev => {
+  ev.preventDefault(); if (!management || modalSaving) return;
+  const m = {...management}, payload = {action:m.action,name:m.name,revision:m.revision};
+  if (m.action === 'edit') payload.proxy = {name:$('edit-name').value.trim(),scheme:$('edit-scheme').value,port:$('edit-port').value.trim(),host:$('edit-host').value.trim(),username:$('edit-user').value,password_action:$('edit-password-action').value,password:$('edit-password').value};
+  else if (m.action === 'duplicate') payload.new_name = $('edit-name').value.trim();
+  else payload.replacements = Object.fromEntries([...$('delete-replacements').querySelectorAll('select')].map(n => [n.dataset.replacement,n.value]));
+  modalSaving = true; dialogError(''); updateControls();
+  const controls = [...$('manage-form').querySelectorAll('input,select,button')].map(n => [n,n.disabled]); controls.forEach(([n]) => n.disabled = true);
+  const oldLabel = $('confirm-management').textContent; $('confirm-management').textContent = 'Сохранение…';
+  try {
+    const d = await api('/connections/mutate',payload);
+    for (const [t,value] of choices) if (value === m.name) choices.set(t,m.action === 'delete' ? payload.replacements[t] || null : m.action === 'edit' ? d.name : value);
+    if (m.action === 'duplicate') { selected = d.name; choices.set(tool,selected); }
+    else if (selected === m.name) { selected = m.action === 'delete' ? payload.replacements[tool] || null : d.name; choices.set(tool,selected); }
+    await refresh(); $('route-dialog').close();
+    notify(m.action === 'delete' ? 'Прокси удалён. Назначения обновлены.' : m.action === 'duplicate' ? 'Копия «' + d.name + '» создана. Она выбрана для разового запуска.' : 'Прокси сохранён. Назначения обновлены.');
+  } catch (err) { dialogError(errorText(err)); }
+  finally { modalSaving = false; controls.forEach(([n,was]) => n.disabled = was); $('confirm-management').textContent = oldLabel; updateControls(); }
+};
+setMode(mode);
+refresh().then(ok => { if (ok) checkReadiness(); });
+setInterval(() => { if (!busy && !adding && !modalSaving) refresh(); },5000);
+
 </script>
 </body>
 </html>

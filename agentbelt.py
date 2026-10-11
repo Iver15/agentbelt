@@ -14,10 +14,12 @@ HTTP-сервер на 127.0.0.1 отдаёт страницы для боков
 import asyncio
 import copy
 import glob
+import hashlib
 import json
 import os
 import re
 import shlex
+import signal
 import sys
 import threading
 import time
@@ -34,6 +36,7 @@ PI_DIR = os.path.expanduser("~/.pi")
 OMP_DIR = os.path.expanduser("~/.omp")
 VERSION = "0.1.0"
 BOOT = str(int(time.time()))
+PROXY_REVISION_KEY = os.urandom(32)
 
 DEFAULTS = {
     "port": 47811,
@@ -1286,7 +1289,7 @@ def _save_network(new: dict, cfg: dict) -> str | None:
     """Proxies, servers and the router from the Settings page. Returns an error or None."""
     if isinstance(new.get("proxies"), list):
         old = {px.get("name"): px.get("url", "") for px in cfg.get("proxies") or []}
-        out, seen = [], set()
+        out, seen, renames, origins = [], set(), {}, set()
         for px in new["proxies"]:
             if not isinstance(px, dict):
                 continue
@@ -1295,8 +1298,17 @@ def _save_network(new: dict, cfg: dict) -> str | None:
                 continue
             if not name or name in seen or name == "direct":
                 return f"Имя прокси «{name}» пустое, занято или зарезервировано"
+            orig = px.get("orig")
+            if orig is not None and not isinstance(orig, str):
+                return "Исходное имя прокси должно быть строкой"
             if "***" in url:  # untouched masked URL: keep the stored one
-                url = old.get(px.get("orig") or name, "")
+                url = old.get(orig or name, "")
+            if orig in old:
+                if orig in origins:
+                    return "Один исходный прокси указан несколько раз"
+                origins.add(orig)
+                if orig != name:
+                    renames[orig] = name
             try:
                 _connection_proxy({"name": name, "url": url}, {"proxies": []})
             except ValueError as ex:
@@ -1304,6 +1316,9 @@ def _save_network(new: dict, cfg: dict) -> str | None:
             seen.add(name)
             out.append({"name": name, "url": url})
         cfg["proxies"] = out
+        for agent in cfg["agents"].values():
+            if isinstance(agent.get("proxy"), str) and agent["proxy"] in renames:
+                agent["proxy"] = renames[agent["proxy"]]
     if isinstance(new.get("servers"), list):
         out = []
         for sv in new["servers"]:
@@ -1357,6 +1372,10 @@ def settings_save(body: bytes) -> str:
     err = _save_network(new, cfg)
     if err:
         return err
+    try:
+        _validate_proxy_assignments(cfg)
+    except ValueError as ex:
+        return str(ex)
     save_config(cfg)
     CACHE.pop("net:probe", None)
     CFG.clear()
@@ -1613,6 +1632,166 @@ def _connection_proxy(data: dict, cfg: dict) -> dict:
     return {"name": name, "url": url}
 
 
+def _validate_proxy_assignments(cfg: dict):
+    names = {"direct", *(p["name"] for p in cfg.get("proxies") or [])}
+    for tool, agent in cfg["agents"].items():
+        name = agent.get("proxy")
+        if name is not None and not isinstance(name, str):
+            raise ValueError(f"Маршрут для {tool} должен быть строкой")
+        if name and name not in names:
+            raise ValueError(f"Маршрут для {tool} не существует. Выберите замену перед удалением прокси")
+
+
+def _proxy_revision(proxy: dict) -> str:
+    # Opaque version token: a stale form must not overwrite a rotated password.
+    raw = json.dumps(proxy, sort_keys=True).encode()
+    return hashlib.sha256(PROXY_REVISION_KEY + raw).hexdigest()
+
+
+def _proxy_used_by(cfg: dict, name: str) -> list:
+    return [tool for tool, agent in cfg["agents"].items() if agent.get("proxy") == name]
+
+
+def connection_details(name: str) -> dict:
+    proxy = next((p for p in CFG.get("proxies") or [] if p["name"] == name), None)
+    if not proxy:
+        return {"ok": False, "error": "Неизвестный прокси"}
+    u = urllib.parse.urlsplit(proxy["url"])
+    return {"ok": True, "revision": _proxy_revision(proxy), "used_by": _proxy_used_by(CFG, name),
+            "proxy": {"name": name, "scheme": u.scheme, "host": u.hostname, "port": u.port,
+                      "username": urllib.parse.unquote(u.username or ""), "password_set": bool(u.password)}}
+
+
+def connections_mutate(body: bytes) -> dict:
+    try:
+        data = _connection_body(body)
+        cfg = load_config()
+        name = data.get("name")
+        old = next((p for p in cfg.get("proxies") or [] if p["name"] == name), None)
+        if not old:
+            raise ValueError("Неизвестный прокси")
+        if data.get("revision") != _proxy_revision(old):
+            raise ValueError("Прокси изменён. Закройте форму и откройте её заново")
+        action = data.get("action")
+        remaining = [p for p in cfg["proxies"] if p["name"] != name]
+        result = {"ok": True}
+        if action == "edit":
+            fields = data.get("proxy")
+            if not isinstance(fields, dict):
+                raise ValueError("Ожидаются параметры прокси")
+            fields = dict(fields)
+            password_action = fields.get("password_action", "keep")
+            if password_action == "keep":
+                fields["password"] = urllib.parse.unquote(urllib.parse.urlsplit(old["url"]).password or "")
+            elif password_action == "remove":
+                fields["password"] = ""
+            elif password_action != "replace" or not isinstance(fields.get("password"), str) or not fields["password"]:
+                raise ValueError("Выберите действие с паролем; для замены введите новый пароль")
+            # Edits use fields so keeping the password never needs a masked URL roundtrip.
+            fields.pop("url", None)
+            updated = _connection_proxy(fields, {"proxies": remaining})
+            cfg["proxies"] = [updated if p["name"] == name else p for p in cfg["proxies"]]
+            for agent in cfg["agents"].values():
+                if agent.get("proxy") == name:
+                    agent["proxy"] = updated["name"]
+            result["name"] = updated["name"]
+        elif action == "duplicate":
+            duplicate = _connection_proxy({"name": data.get("new_name"), "url": old["url"]}, cfg)
+            cfg["proxies"].append(duplicate)
+            result["name"] = duplicate["name"]
+        elif action == "delete":
+            affected = _proxy_used_by(cfg, name)
+            replacements = data.get("replacements", {})
+            if not isinstance(replacements, dict) or set(replacements) != set(affected):
+                raise ValueError("Выберите замену для каждого агента, использующего этот прокси")
+            names = {"direct", *(p["name"] for p in remaining)}
+            for tool, replacement in replacements.items():
+                if not isinstance(replacement, str) or replacement not in names:
+                    raise ValueError("Замена должна быть существующим маршрутом или прямым подключением")
+                cfg["agents"][tool]["proxy"] = replacement
+            cfg["proxies"] = remaining
+        else:
+            raise ValueError("Неизвестное действие с прокси")
+        _validate_proxy_assignments(cfg)
+        save_config(cfg)
+        CFG.clear()
+        CFG.update(cfg)
+        CACHE.pop("net:probe", None)
+        for route in (name, result.get("name")):
+            CACHE.pop("connections:probe:" + (route or ""), None)
+        return result
+    except ValueError as ex:
+        return {"ok": False, "error": str(ex)}
+    except OSError:
+        return {"ok": False, "error": "Не удалось сохранить конфигурацию"}
+
+
+async def probe_launch_clis() -> dict:
+    # Same login/interactive shell as a new iTerm session; command -v never runs the CLI.
+    script = ('for tool in claude codex; do '
+              'if command -v "$tool" >/dev/null 2>&1; then found=1; else found=0; fi; '
+              'printf "\\n__AGENTBELT_CLI__%s=%s\\n" "$tool" "$found"; done')
+    process = None
+    rc, out = 1, ""
+    try:
+        process = await asyncio.create_subprocess_exec(
+            os.environ.get("SHELL") or "/bin/zsh", "-lic", script, env=NOPROXY_ENV,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
+        raw, _ = await asyncio.wait_for(process.communicate(), 5)
+        rc, out = process.returncode, raw.decode("utf-8", "replace")
+    except asyncio.CancelledError:
+        raise
+    except (OSError, asyncio.TimeoutError):
+        pass
+    finally:
+        if process and rc != 0:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            await process.communicate()
+    found = dict(re.findall(r"^__AGENTBELT_CLI__(claude|codex)=([01])$", out, re.M)) if rc == 0 else {}
+    complete = set(found) == {"claude", "codex"}
+    return {**{tool: found[tool] == "1" if complete else None for tool in ("claude", "codex")},
+            "error": "" if complete else "Не удалось проверить CLI в командной оболочке"}
+
+
+def launch_readiness(cli: dict | None = None) -> dict:
+    cwd = STATE.get("cwd") or ""
+    hit = CACHE.get("launch:cli")
+    return {"iterm": CONN.get("c") is not None, "directory": bool(cwd and os.path.isdir(cwd)),
+            "cli": cli if cli is not None else hit[1] if hit else None}
+
+
+async def connections_readiness() -> dict:
+    cli = await probe_launch_clis()
+    CACHE["launch:cli"] = (time.monotonic(), cli)
+    return {"ok": True, "readiness": launch_readiness(cli)}
+
+
+async def connections_launch(body: bytes) -> dict:
+    try:
+        data = _connection_body(body)
+        tool, name, cwd = data.get("tool"), data.get("proxy"), data.get("dir")
+        if tool not in ("claude", "codex"):
+            raise ValueError("Выберите Claude или Codex")
+        if not isinstance(name, str) or name not in {"direct", *(p["name"] for p in CFG.get("proxies") or [])}:
+            raise ValueError("Выберите существующий маршрут для разового запуска")
+        if not isinstance(cwd, str) or not os.path.isabs(cwd) or not os.path.isdir(cwd):
+            raise ValueError("Каталог проекта не существует")
+        if CONN.get("c") is None:
+            raise ValueError("Нет соединения с iTerm2")
+        cli = await cached("launch:cli", 60, probe_launch_clis)
+        if cli.get(tool) is not True:
+            raise ValueError(cli.get("error") or f"CLI {tool} не найден в новой командной оболочке")
+        res = await open_agent({"tool": tool, "proxy": name, "dir": cwd, "where": CFG.get("open_in", "window")})
+        return {"ok": True} if res == "ok" else {"ok": False, "error": res}
+    except ValueError as ex:
+        return {"ok": False, "error": str(ex)}
+    except Exception:
+        return {"ok": False, "error": "Не удалось отправить команду в iTerm2"}
+
+
 def connections_save(body: bytes) -> dict:
     try:
         data = _connection_body(body)
@@ -1629,6 +1808,7 @@ def connections_save(body: bytes) -> dict:
             cfg["agents"][tool]["proxy"] = name
         if "proxy" not in data and not defaults:
             raise ValueError("Нет изменений для сохранения")
+        _validate_proxy_assignments(cfg)
         save_config(cfg)
         CFG.clear()
         CFG.update(cfg)
@@ -1676,10 +1856,10 @@ async def connections_state() -> dict:
                           and p["hp"] == route["hp"]), None) if probe else None
             if known:
                 route = {**route, "res": known["res"], "at": probe[1]["at"]}
-        routes.append(route)
+        routes.append({**route, "used_by": _proxy_used_by(CFG, px["name"])})
     return {"ok": True, "v": BOOT, "cwd": STATE.get("cwd") or "", "open_in": CFG.get("open_in", "window"),
             "defaults": {t: CFG["agents"][t].get("proxy") or "" for t in ("claude", "codex")},
-            "routes": routes}
+            "routes": routes, "readiness": launch_readiness()}
 
 
 PAGES = {"/": "git.html", "/agent": "agent.html", "/sessions": "sessions.html", "/settings": "settings.html",
@@ -1713,6 +1893,11 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
                 out, ctype = asset.read(), "image/svg+xml"
         elif u.path == "/connections/state":
             out = json.dumps(await connections_state(), ensure_ascii=False).encode()
+        elif u.path == "/connections/details":
+            result = connection_details(qs.get("name", ""))
+            out = json.dumps(result, ensure_ascii=False).encode()
+            if not result["ok"]:
+                status = b"400 Bad Request"
         elif u.path == "/state":
             out = json.dumps(await git_state(), ensure_ascii=False).encode()
         elif u.path == "/diff":
@@ -1732,10 +1917,21 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         elif u.path == "/settings/state":
             out = json.dumps(settings_state(), ensure_ascii=False).encode()
         elif u.path in ("/sessions/open", "/sessions/focus", "/settings/save", "/snaps/save", "/snaps/restore",
-                        "/net/copy", "/open-url", "/connections/save", "/connections/check") and not mutating:
+                        "/net/copy", "/open-url", "/connections/save", "/connections/check",
+                        "/connections/mutate", "/connections/readiness", "/connections/launch") and not mutating:
             out, ctype, status = "Доступ запрещён".encode(), "text/plain; charset=utf-8", b"403 Forbidden"
         elif u.path in ("/connections/save", "/connections/check"):
             result = connections_save(body) if u.path == "/connections/save" else await connections_check(body)
+            out = json.dumps(result, ensure_ascii=False).encode()
+            if not result["ok"]:
+                status = b"400 Bad Request"
+        elif u.path in ("/connections/mutate", "/connections/readiness", "/connections/launch"):
+            if u.path == "/connections/mutate":
+                result = connections_mutate(body)
+            elif u.path == "/connections/readiness":
+                result = await connections_readiness()
+            else:
+                result = await connections_launch(body)
             out = json.dumps(result, ensure_ascii=False).encode()
             if not result["ok"]:
                 status = b"400 Bad Request"

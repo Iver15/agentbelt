@@ -71,7 +71,7 @@ function render(d){C=d.config;
   h+=`<div class="s" id="network"><h3>Network</h3>
    <div class="mut">Proxies are probed every minute against the API of each agent CLI and get ⧉ export / ▶ claude / ▶ codex in Agent actions. Everything stays in the local config; passwords are masked here and kept as is unless you type a new URL.</div>
    <div class="card"><b>Proxies</b><div id="pxs">${(C.proxies||[]).map(pxRow).join("")}</div><button id="addpx">+ proxy</button></div>
-   <div class="card"><b>Servers</b> <span class="mut">ping and a TCP check from this Mac; untick the banner for non-SSH ports (MTProto, VPN)</span><div id="svs">${(C.servers||[]).map(svRow).join("")}</div><button id="addsv">+ server</button></div>
+   <div class="card"><b>Servers</b> <span class="mut">ping and a TCP check from this ${/Win/.test(navigator.platform)?"PC":"Mac"}; untick the banner for non-SSH ports (MTProto, VPN)</span><div id="svs">${(C.servers||[]).map(svRow).join("")}</div><button id="addsv">+ server</button></div>
    <div class="card"><b>Keenetic router</b> <span class="mut">optional: tunnels and per-domain routes over RCI; empty address turns it off</span>
     <div class="row"><input type="text" id="kn_host" placeholder="192.168.1.1" value="${e(kn.host||"")}" style="width:130px"><input type="text" id="kn_login" placeholder="admin" value="${e(kn.login||"")}" style="width:90px"><input type="password" id="kn_pass" placeholder="${kn.password_set?"password unchanged":"password"}"></div></div></div>`;
   h+=`<div class="s"><h3>Repo checks</h3><div class="mut">Your own lines in the Git &amp; PR tab: if <code>file</code> exists in the repo root, <code>cmd</code> runs; exit 0 is green, anything else red.</div>

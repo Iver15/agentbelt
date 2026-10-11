@@ -37,10 +37,31 @@ def wezterm_exe() -> str:
     return "wezterm"
 
 
-def cli(*args: str, timeout: float = 5) -> tuple[int, str]:
+def gui_socket() -> str | None:
+    """Socket of the running WezTerm window process (gui-sock-<pid>). Without it `wezterm cli`
+    falls back to a background mux server, which it may even start itself, and then sees
+    none of the panes on screen."""
+    d = os.path.join(os.path.expanduser("~"), ".local", "share", "wezterm")
     try:
-        r = subprocess.run([wezterm_exe(), "cli", *args], capture_output=True, text=True, timeout=timeout,
-                           encoding="utf-8", errors="replace", creationflags=CREATE_NO_WINDOW)
+        socks = [os.path.join(d, n) for n in os.listdir(d) if n.startswith("gui-sock-")]
+    except OSError:
+        return None
+    alive = []
+    for s in socks:
+        pid = s.rsplit("-", 1)[-1]
+        if pid.isdigit() and (psutil is None or psutil.pid_exists(int(pid))):
+            alive.append(s)
+    return max(alive, key=os.path.getmtime) if alive else None
+
+
+def cli(*args: str, timeout: float = 5) -> tuple[int, str]:
+    sock = gui_socket()
+    if not sock:
+        return 1, "WezTerm is not running"
+    env = dict(os.environ, WEZTERM_UNIX_SOCKET=sock)
+    try:
+        r = subprocess.run([wezterm_exe(), "cli", "--no-auto-start", *args], capture_output=True, text=True,
+                           timeout=timeout, encoding="utf-8", errors="replace", creationflags=CREATE_NO_WINDOW, env=env)
         return r.returncode, r.stdout if r.returncode == 0 else r.stderr
     except (OSError, subprocess.TimeoutExpired) as e:
         return 1, str(e)

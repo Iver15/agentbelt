@@ -175,7 +175,17 @@ def active_agents(claude_dir: str) -> list[dict]:
         if k not in claude or (a["since"] or 0) > (claude[k]["since"] or 0):
             claude[k] = a
     out = list(claude.values())
+    known = {int(a["pid"]) for a in out}
     if psutil is not None:
+        # Claude writes sessions/<pid>.json a moment after start (after the folder-trust
+        # prompt); until then the bare process still shows up, without a session id.
+        for p in psutil.process_iter(["pid", "name"]):
+            try:
+                if (p.info.get("name") or "").lower() in ("claude.exe", "claude") and p.pid not in known:
+                    out.append({"tool": "claude", "pid": p.pid, "id": "", "dir": p.cwd(), "name": "",
+                                "status": "starting", "since": int(p.create_time() * 1000)})
+            except (psutil.Error, OSError):
+                continue
         for p in psutil.process_iter(["pid", "name", "cmdline"]):
             try:
                 cmd = p.info.get("cmdline") or []
